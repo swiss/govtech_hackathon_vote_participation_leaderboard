@@ -1,0 +1,8 @@
+[
+  {
+    "kind": 2,
+    "language": "sparql",
+    "value": "#pragma describe.strategy cbd\n#pragma join.hash off\nSELECT ?dimension0 ?dimension1 ?dimension2 ?dimension3 WHERE {\n  <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .\n  ?observationSet0 <https://cube.link/observation> ?source0 .\n  ?source0 <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?dimension0 .\n  ?source0 <https://politics.ld.admin.ch/political-rights/popular-vote/stimmbeteiligung> ?dimension1 .\n  ?source0 <https://politics.ld.admin.ch/political-rights/popular-vote/id> ?dimension2 .\n  FILTER (\n    (?dimension0 = <https://ld.admin.ch/country/CHE>)\n  )\n  OPTIONAL {\n    ?dimension0 <http://schema.org/name> ?dimension3_0 .\n    FILTER (\n      LANGMATCHES(LANG(?dimension3_0), \"de\")\n    )\n  }\n  OPTIONAL {\n    ?dimension0 <http://schema.org/name> ?dimension3_1 .\n    FILTER (\n      LANGMATCHES(LANG(?dimension3_1), \"fr\")\n    )\n  }\n  OPTIONAL {\n    ?dimension0 <http://schema.org/name> ?dimension3_2 .\n    FILTER (\n      LANGMATCHES(LANG(?dimension3_2), \"it\")\n    )\n  }\n  OPTIONAL {\n    ?dimension0 <http://schema.org/name> ?dimension3_3 .\n    FILTER (\n      LANGMATCHES(LANG(?dimension3_3), \"en\")\n    )\n  }\n  OPTIONAL {\n    ?dimension0 <http://schema.org/name> ?dimension3_4 .\n    FILTER (\n      (LANG(?dimension3_4) = \"\")\n    )\n  }\n  \n  BIND(COALESCE(?dimension3_0, ?dimension3_1, ?dimension3_2, ?dimension3_3, ?dimension3_4) AS ?dimension3)\n}",
+    "metadata": {}
+  }
+]
