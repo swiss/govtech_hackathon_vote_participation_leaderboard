@@ -13,7 +13,6 @@
 <main class="page">
     <header>
         <div>
-            <div class="eyebrow">D3.js Visualisierung</div>
             <h1>Kantonsranking über Zeit</h1>
             <p class="intro">
                 Multi-Line-Chart mit dynamischem Zeitraumfilter. Jede Linie steht für einen Kanton;
@@ -28,34 +27,8 @@
         </aside>
     </header>
 
-    <section class="controls" aria-label="Filter">
-        <div class="control-grid">
-            <div class="control-group">
-                <label>
-                    <span>Zeitraum</span>
-                    <strong id="rangeLabel">–</strong>
-                </label>
-                <div class="range-slider-container">
-                    <input id="fromSlider" type="range" min="0" max="0" value="0" step="1" />
-                    <input id="toSlider" type="range" min="0" max="0" value="0" step="1" />
-                    <div class="slider-track"></div>
-                </div>
-            </div>
-
-            <div class="select-wrap">
-                <select id="rankingMode" title="Ranking-Modus">
-                    <option value="avg">Ranking: Durchschnitt</option>
-                    <option value="end">Ranking: Endwert</option>
-                    <option value="change">Ranking: Veränderung</option>
-                </select>
-                <button id="resetButton" type="button">Reset</button>
-                <button id="playRaceButton" type="button" class="btn-primary">▶ Race starten</button>
-            </div>
-        </div>
-    </section>
-
     <section class="dashboard">
-        <article class="chart-card race-card" id="raceContainer" style="display: none;">
+        <article class="chart-card race-card" id="raceContainer">
             <div class="card-header">
                 <div>
                     <h2>Bar Chart Race</h2>
@@ -63,13 +36,44 @@
                 </div>
                 <div class="race-controls">
                     <span id="raceDateLabel" class="race-date"></span>
-                    <button id="stopRaceButton" type="button">✖ Schliessen</button>
+                    <button id="replayRaceButton" type="button" class="btn-primary">↺ Neustart</button>
+                    <button id="pauseRaceButton" type="button">⏸ Pause</button>
+                    <select id="raceSpeed" title="Geschwindigkeit">
+                        <option value="600">Langsam</option>
+                        <option value="300" selected>Normal</option>
+                        <option value="120">Schnell</option>
+                    </select>
                 </div>
             </div>
             <div class="chart-wrap">
                 <svg id="raceChart" viewBox="0 0 980 600"></svg>
             </div>
         </article>
+
+        <section class="controls" aria-label="Filter">
+            <div class="control-grid">
+                <div class="control-group">
+                    <label>
+                        <span>Zeitraum</span>
+                        <strong id="rangeLabel">–</strong>
+                    </label>
+                    <div class="range-slider-container">
+                        <input id="fromSlider" type="range" min="0" max="0" value="0" step="1" />
+                        <input id="toSlider" type="range" min="0" max="0" value="0" step="1" />
+                        <div class="slider-track"></div>
+                    </div>
+                </div>
+
+                <div class="select-wrap">
+                    <select id="rankingMode" title="Ranking-Modus">
+                        <option value="avg">Ranking: Durchschnitt</option>
+                        <option value="end">Ranking: Endwert</option>
+                        <option value="change">Ranking: Veränderung</option>
+                    </select>
+                    <button id="resetButton" type="button">Reset</button>
+                </div>
+            </div>
+        </section>
 
         <article class="chart-card">
             <div class="card-header">

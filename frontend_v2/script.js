@@ -39,8 +39,9 @@ const toSlider = document.querySelector("#toSlider");
 const rangeLabel = document.querySelector("#rangeLabel");
 const rankingMode = document.querySelector("#rankingMode");
 const resetButton = document.querySelector("#resetButton");
-const playRaceButton = document.querySelector("#playRaceButton");
-const stopRaceButton = document.querySelector("#stopRaceButton");
+const replayRaceButton = document.querySelector("#replayRaceButton");
+const pauseRaceButton = document.querySelector("#pauseRaceButton");
+const raceSpeedSelect = document.querySelector("#raceSpeed");
 const raceContainer = document.querySelector("#raceContainer");
 const raceDateLabel = document.querySelector("#raceDateLabel");
 const rankingDescription = document.querySelector("#rankingDescription");
@@ -83,8 +84,9 @@ g.append("text")
     .attr("x", -innerHeight / 2)
     .attr("y", -44)
     .attr("transform", "rotate(-90)")
-    .attr("fill", "#94a3b8")
+    .attr("fill", "#475569")
     .attr("font-size", 12)
+    .attr("font-weight", 700)
     .attr("text-anchor", "middle")
     .text("Wert");
 
@@ -216,7 +218,7 @@ function init(rawData) {
     );
 
     // -------------------------------------------------------------------------
-    // 3) UI initialisieren
+    // 3) UI initialisieren (Standard: Ganze Zeitspanne)
     // -------------------------------------------------------------------------
     state.fromIndex = 0;
     state.toIndex = votes.length - 1;
@@ -288,6 +290,7 @@ function init(rawData) {
         .attr("y", d => y(d.values.at(-1).value));
 
     update();
+    startRace(false);
 }
 
 function updateSliderTrack() {
@@ -343,19 +346,31 @@ resetButton.addEventListener("click", () => {
 // 7) Bar Chart Race
 // -------------------------------------------------------------------------
 let raceInterval = null;
-const n = 12; // Top 12 Kantone anzeigen
-const duration = 250; //ms zwischen Frames
+let raceIsPaused = false;
+let raceSpeed = 300;
+let raceK = 0;
+let raceKeyframes = [];
+let globalTogglePause = null;
+let globalChangeSpeed = null;
+const n = 26; // Alle 26 Kantone anzeigen
 
-playRaceButton.addEventListener("click", () => {
-    raceContainer.style.display = "block";
-    startRace();
-    playRaceButton.scrollIntoView({ behavior: "smooth" });
-});
+if (replayRaceButton) {
+    replayRaceButton.addEventListener("click", () => {
+        startRace();
+    });
+}
 
-stopRaceButton.addEventListener("click", () => {
-    stopRace();
-    raceContainer.style.display = "none";
-});
+if (pauseRaceButton) {
+    pauseRaceButton.addEventListener("click", () => {
+        if (globalTogglePause) globalTogglePause();
+    });
+}
+
+if (raceSpeedSelect) {
+    raceSpeedSelect.addEventListener("change", () => {
+        if (globalChangeSpeed) globalChangeSpeed(Number(raceSpeedSelect.value));
+    });
+}
 
 function stopRace() {
     if (raceInterval) {
@@ -364,24 +379,32 @@ function stopRace() {
     }
 }
 
-async function startRace() {
+async function startRace(startImmediately = true) {
     stopRace();
+    raceK = 0;
+    raceIsPaused = !startImmediately;
+    if (pauseRaceButton) {
+        pauseRaceButton.textContent = startImmediately ? "⏸ Pause" : "▶ Starten";
+    }
+    if (raceSpeedSelect) {
+        raceSpeed = Number(raceSpeedSelect.value);
+    }
 
     const raceSvg = d3.select("#raceChart");
     const raceWidth = 980;
     const raceHeight = 600;
-    const raceMargin = { top: 20, right: 120, bottom: 10, left: 100 };
+    const raceMargin = { top: 20, right: 120, bottom: 10, left: 240 };
 
     const xRace = d3.scaleLinear().domain([0, 100]).range([raceMargin.left, raceWidth - raceMargin.right]);
     const yRace = d3.scaleBand()
         .domain(d3.range(n + 1))
         .rangeRound([raceMargin.top, raceMargin.top + (raceHeight - raceMargin.top - raceMargin.bottom) * (n + 1) / n])
-        .padding(0.1);
+        .padding(0.3);
 
     const formatNumber = d3.format(",.1f");
 
     // Bereite Schlüsselbilder vor (Keyframes) mit gleitendem Durchschnitt
-    const keyframes = [];
+    raceKeyframes = [];
     const windowSize = 10; // Durchschnitt über die letzten 10 Abstimmungen
 
     for (let i = 0; i < votes.length; i++) {
@@ -397,17 +420,88 @@ async function startRace() {
         });
 
         const sortedCantons = cantonAverages.sort((a, b) => d3.descending(a.value, b.value));
-        keyframes.push([votes[i].dateObj, sortedCantons]);
+        raceKeyframes.push([votes[i].dateObj, sortedCantons]);
     }
 
-    let k = 0;
-    
+    function runRaceInterval() {
+        if (raceInterval) {
+            raceInterval.stop();
+        }
+        const transitionDuration = Math.max(70, raceSpeed - 40);
+
+        raceInterval = d3.interval(() => {
+            if (raceIsPaused) return;
+            renderFrame(raceK, transitionDuration);
+            raceK++;
+            if (raceK >= raceKeyframes.length) {
+                raceInterval.stop();
+                raceInterval = null;
+                if (pauseRaceButton) {
+                    pauseRaceButton.textContent = "↺ Wiederholen";
+                }
+            }
+        }, raceSpeed);
+    }
+
+    globalTogglePause = () => {
+        if (!raceInterval && raceK >= raceKeyframes.length) {
+            startRace(true);
+            return;
+        }
+        if (!raceInterval && raceK === 0 && raceIsPaused) {
+            raceIsPaused = false;
+            if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
+            runRaceInterval();
+            return;
+        }
+        raceIsPaused = !raceIsPaused;
+        if (raceIsPaused) {
+            if (pauseRaceButton) pauseRaceButton.textContent = "▶ Fortsetzen";
+            if (raceInterval) {
+                raceInterval.stop();
+                raceInterval = null;
+            }
+        } else {
+            if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
+            runRaceInterval();
+        }
+    };
+
+    globalChangeSpeed = (newSpeed) => {
+        raceSpeed = newSpeed;
+        if (raceInterval && !raceIsPaused) {
+            runRaceInterval();
+        }
+    };
+
     // Initiales Zeichnen
-    function renderFrame(index) {
-        const [date, frameData] = keyframes[index];
+    function renderFrame(index, transitionDuration) {
+        const [date, frameData] = raceKeyframes[index];
         raceDateLabel.textContent = formatDate(date);
 
         const displayedData = frameData.slice(0, n);
+
+        // Update top leader card in real-time with the race
+        const currentTop = displayedData[0];
+        if (currentTop) {
+            topCanton.textContent = currentTop.id;
+            topCantonSub.textContent = `${currentTop.label}: ${formatValue(currentTop.value)}%`;
+        }
+
+        // Draw static rank numbers on the far left
+        raceSvg.selectAll("text.race-rank-static")
+            .data(d3.range(n))
+            .join("text")
+            .attr("class", "race-rank-static")
+            .attr("text-anchor", "start")
+            .attr("x", 20)
+            .attr("y", i => yRace(i) + yRace.bandwidth() / 2)
+            .attr("dy", "0.35em")
+            .style("font-family", "inherit")
+            .style("font-weight", i => i < 3 ? "900" : "700")
+            .style("font-size", i => i === 0 ? "16px" : i < 3 ? "14px" : "13px")
+            .style("fill", i => i === 0 ? "#b58900" : i === 1 ? "#64748b" : i === 2 ? "#a16207" : "var(--muted)")
+            .text(i => `#${i + 1}`);
 
         raceSvg.selectAll("rect.bar")
             .data(displayedData, d => d.id)
@@ -420,11 +514,15 @@ async function startRace() {
                     .attr("height", yRace.bandwidth())
                     .attr("width", 0),
                 update => update,
-                exit => exit.transition().duration(duration).attr("width", 0).attr("y", yRace(n)).remove()
+                exit => exit.transition().duration(transitionDuration).attr("width", 0).attr("y", yRace(n)).remove()
             )
-            .transition().duration(duration).ease(d3.easeLinear)
+            .transition().duration(transitionDuration).ease(d3.easeLinear)
             .attr("y", (d, i) => yRace(i))
-            .attr("width", d => xRace(d.value) - xRace(0));
+            .attr("width", d => xRace(d.value) - xRace(0))
+            .selection()
+            .classed("podium-1", (d, i) => i === 0)
+            .classed("podium-2", (d, i) => i === 1)
+            .classed("podium-3", (d, i) => i === 2);
 
         raceSvg.selectAll("text.bar-label")
             .data(displayedData, d => d.id)
@@ -432,16 +530,20 @@ async function startRace() {
                 enter => enter.append("text")
                     .attr("class", "bar-label")
                     .attr("text-anchor", "end")
-                    .attr("x", xRace(0) - 6)
+                    .attr("x", xRace(0) - 10)
                     .attr("y", d => yRace(n) + yRace.bandwidth() / 2)
                     .attr("dy", "0.35em")
                     .text(d => d.label),
                 update => update,
-                exit => exit.transition().duration(duration).attr("y", yRace(n)).remove()
+                exit => exit.transition().duration(transitionDuration).attr("y", yRace(n)).remove()
             )
-            .transition().duration(duration).ease(d3.easeLinear)
+            .transition().duration(transitionDuration).ease(d3.easeLinear)
             .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
-            .text(d => d.label);
+            .text(d => d.label)
+            .selection()
+            .classed("podium-1", (d, i) => i === 0)
+            .classed("podium-2", (d, i) => i === 1)
+            .classed("podium-3", (d, i) => i === 2);
 
         raceSvg.selectAll("text.bar-value")
             .data(displayedData, d => d.id)
@@ -453,24 +555,26 @@ async function startRace() {
                     .attr("dy", "0.35em")
                     .text(d => formatNumber(d.value) + "%"),
                 update => update,
-                exit => exit.transition().duration(duration).attr("y", yRace(n)).remove()
+                exit => exit.transition().duration(transitionDuration).attr("y", yRace(n)).remove()
             )
-            .transition().duration(duration).ease(d3.easeLinear)
+            .transition().duration(transitionDuration).ease(d3.easeLinear)
             .attr("x", d => xRace(d.value) + 6)
             .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
             .textTween(function(d) {
                 const i = d3.interpolateNumber(parseFloat(this.textContent) || 0, d.value);
                 return t => formatNumber(i(t)) + "%";
-            });
+            })
+            .selection()
+            .classed("podium-1", (d, i) => i === 0)
+            .classed("podium-2", (d, i) => i === 1)
+            .classed("podium-3", (d, i) => i === 2);
     }
 
-    raceInterval = d3.interval(() => {
-        renderFrame(k);
-        k++;
-        if (k >= keyframes.length) {
-            raceInterval.stop();
-        }
-    }, duration);
+    if (startImmediately) {
+        runRaceInterval();
+    } else {
+        renderFrame(0, 0);
+    }
 }
 
 function getSelectedVotes() {
