@@ -9,4 +9,3 @@ SELECT ?date ?region (AVG(?participation) AS ?participation) WHERE {
 }
 GROUP BY ?date ?region
 ORDER BY DESC(?date) ?region
-LIMIT 20

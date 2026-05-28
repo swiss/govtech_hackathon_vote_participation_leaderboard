@@ -39,6 +39,10 @@ const toSlider = document.querySelector("#toSlider");
 const rangeLabel = document.querySelector("#rangeLabel");
 const rankingMode = document.querySelector("#rankingMode");
 const resetButton = document.querySelector("#resetButton");
+const playRaceButton = document.querySelector("#playRaceButton");
+const stopRaceButton = document.querySelector("#stopRaceButton");
+const raceContainer = document.querySelector("#raceContainer");
+const raceDateLabel = document.querySelector("#raceDateLabel");
 const rankingDescription = document.querySelector("#rankingDescription");
 const topCanton = document.querySelector("#topCanton");
 const topCantonSub = document.querySelector("#topCantonSub");
@@ -93,8 +97,86 @@ const rangeWindow = g.append("rect")
 const seriesGroup = g.append("g").attr("class", "series-group");
 const labelsGroup = g.append("g").attr("class", "labels-group");
 
-d3.json("data.json").then(rawData => {
-    init(rawData);
+const sparqlQuery = `SELECT ?date ?region (AVG(?participation) AS ?participation) WHERE {
+  <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .
+  ?observationSet0 <https://cube.link/observation> ?votation .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/stimmbeteiligung> ?participation .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date .
+
+  FILTER(STRSTARTS(STR(?region), "https://ld.admin.ch/canton/"))
+}
+GROUP BY ?date ?region
+ORDER BY DESC(?date) ?region`;
+
+const cantonMap = {
+    'https://ld.admin.ch/canton/1': { id: 'ZH', label: 'Zürich', councillor: 1 },
+    'https://ld.admin.ch/canton/2': { id: 'BE', label: 'Bern', councillor: 1 },
+    'https://ld.admin.ch/canton/3': { id: 'LU', label: 'Luzern', councillor: 0 },
+    'https://ld.admin.ch/canton/4': { id: 'UR', label: 'Uri', councillor: 0 },
+    'https://ld.admin.ch/canton/5': { id: 'SZ', label: 'Schwyz', councillor: 0 },
+    'https://ld.admin.ch/canton/6': { id: 'OW', label: 'Obwalden', councillor: 0 },
+    'https://ld.admin.ch/canton/7': { id: 'NW', label: 'Nidwalden', councillor: 0 },
+    'https://ld.admin.ch/canton/8': { id: 'GL', label: 'Glarus', councillor: 0 },
+    'https://ld.admin.ch/canton/9': { id: 'ZG', label: 'Zug', councillor: 0 },
+    'https://ld.admin.ch/canton/10': { id: 'FR', label: 'Freiburg', councillor: 1 },
+    'https://ld.admin.ch/canton/11': { id: 'SO', label: 'Solothurn', councillor: 0 },
+    'https://ld.admin.ch/canton/12': { id: 'BS', label: 'Basel-Stadt', councillor: 1 },
+    'https://ld.admin.ch/canton/13': { id: 'BL', label: 'Basel-Landschaft', councillor: 0 },
+    'https://ld.admin.ch/canton/14': { id: 'SH', label: 'Schaffhausen', councillor: 0 },
+    'https://ld.admin.ch/canton/15': { id: 'AR', label: 'Appenzell Ausserrhoden', councillor: 0 },
+    'https://ld.admin.ch/canton/16': { id: 'AI', label: 'Appenzell Innerrhoden', councillor: 0 },
+    'https://ld.admin.ch/canton/17': { id: 'SG', label: 'St. Gallen', councillor: 1 },
+    'https://ld.admin.ch/canton/18': { id: 'GR', label: 'Graubünden', councillor: 0 },
+    'https://ld.admin.ch/canton/19': { id: 'AG', label: 'Aargau', councillor: 0 },
+    'https://ld.admin.ch/canton/20': { id: 'TG', label: 'Thurgau', councillor: 0 },
+    'https://ld.admin.ch/canton/21': { id: 'TI', label: 'Tessin', councillor: 1 },
+    'https://ld.admin.ch/canton/22': { id: 'VD', label: 'Waadt', councillor: 1 },
+    'https://ld.admin.ch/canton/23': { id: 'VS', label: 'Wallis', councillor: 1 },
+    'https://ld.admin.ch/canton/24': { id: 'NE', label: 'Neuenburg', councillor: 0 },
+    'https://ld.admin.ch/canton/25': { id: 'GE', label: 'Genf', councillor: 0 },
+    'https://ld.admin.ch/canton/26': { id: 'JU', label: 'Jura', councillor: 0 }
+};
+
+async function fetchLiveResults() {
+    const endpoint = 'https://ld.admin.ch/query';
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/sparql-query',
+            'Accept': 'application/sparql-results+json'
+        },
+        body: sparqlQuery
+    });
+    if (!response.ok) throw new Error('Network response was not ok');
+    const result = await response.json();
+    return transformSparqlData(result);
+}
+
+function transformSparqlData(sparqlResult) {
+    const bindings = sparqlResult.results.bindings;
+    const groupedByDate = {};
+    bindings.forEach(b => {
+        if (!b.date || !b.region || !b.participation) return;
+        const date = b.date.value;
+        const regionUri = b.region.value;
+        const participation = parseFloat(b.participation.value);
+        if (!groupedByDate[date]) {
+            groupedByDate[date] = { id: `${date}-vote`, date: date, title: `Popular Vote on ${date}`, cantons: [] };
+        }
+        const cantonInfo = cantonMap[regionUri] || { id: regionUri.split('/').pop(), label: regionUri.split('/').pop(), councillor: 0 };
+        groupedByDate[date].cantons.push({ id: cantonInfo.id, label: cantonInfo.label, value: participation, FederalCouncillor: cantonInfo.councillor });
+    });
+    return Object.values(groupedByDate).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+fetchLiveResults().then(liveData => {
+    init(liveData);
+}).catch(err => {
+    console.error('Failed to fetch live data, falling back to data.json', err);
+    d3.json("data.json").then(rawData => {
+        init(rawData);
+    });
 });
 
 function init(rawData) {
@@ -167,7 +249,10 @@ function init(rawData) {
         .attr("d", d => line(d.values))
         .selection()
         .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
-        .on("pointermove", (event, d) => showTooltip(event, d))
+        .on("pointermove", (event, d) => {
+            setActiveCanton(d.id, event);
+            showTooltip(event, d);
+        })
         .on("pointerleave", () => setActiveCanton(null));
 
     seriesGroup.selectAll("path.hit-line")
@@ -182,7 +267,10 @@ function init(rawData) {
         .attr("d", d => line(d.values))
         .selection()
         .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
-        .on("pointermove", (event, d) => showTooltip(event, d))
+        .on("pointermove", (event, d) => {
+            setActiveCanton(d.id, event);
+            showTooltip(event, d);
+        })
         .on("pointerleave", () => setActiveCanton(null));
 
     labelsGroup.selectAll("text")
@@ -251,6 +339,140 @@ resetButton.addEventListener("click", () => {
     update();
 });
 
+// -------------------------------------------------------------------------
+// 7) Bar Chart Race
+// -------------------------------------------------------------------------
+let raceInterval = null;
+const n = 12; // Top 12 Kantone anzeigen
+const duration = 250; //ms zwischen Frames
+
+playRaceButton.addEventListener("click", () => {
+    raceContainer.style.display = "block";
+    startRace();
+    playRaceButton.scrollIntoView({ behavior: "smooth" });
+});
+
+stopRaceButton.addEventListener("click", () => {
+    stopRace();
+    raceContainer.style.display = "none";
+});
+
+function stopRace() {
+    if (raceInterval) {
+        raceInterval.stop();
+        raceInterval = null;
+    }
+}
+
+async function startRace() {
+    stopRace();
+
+    const raceSvg = d3.select("#raceChart");
+    const raceWidth = 980;
+    const raceHeight = 600;
+    const raceMargin = { top: 20, right: 120, bottom: 10, left: 100 };
+
+    const xRace = d3.scaleLinear().domain([0, 100]).range([raceMargin.left, raceWidth - raceMargin.right]);
+    const yRace = d3.scaleBand()
+        .domain(d3.range(n + 1))
+        .rangeRound([raceMargin.top, raceMargin.top + (raceHeight - raceMargin.top - raceMargin.bottom) * (n + 1) / n])
+        .padding(0.1);
+
+    const formatNumber = d3.format(",.1f");
+
+    // Bereite Schlüsselbilder vor (Keyframes) mit gleitendem Durchschnitt
+    const keyframes = [];
+    const windowSize = 10; // Durchschnitt über die letzten 10 Abstimmungen
+
+    for (let i = 0; i < votes.length; i++) {
+        const start = Math.max(0, i - windowSize + 1);
+        const windowVotes = votes.slice(start, i + 1);
+        
+        // Berechne Durchschnitt für jeden Kanton in diesem Fenster
+        const cantonAverages = cantonIds.map(cid => {
+            const values = windowVotes.map(v => v.cantons.find(c => c.id === cid)?.value).filter(v => v !== undefined);
+            const avg = values.length > 0 ? d3.mean(values) : 0;
+            const label = windowVotes[windowVotes.length - 1].cantons.find(c => c.id === cid)?.label || cid;
+            return { id: cid, label: label, value: avg };
+        });
+
+        const sortedCantons = cantonAverages.sort((a, b) => d3.descending(a.value, b.value));
+        keyframes.push([votes[i].dateObj, sortedCantons]);
+    }
+
+    let k = 0;
+    
+    // Initiales Zeichnen
+    function renderFrame(index) {
+        const [date, frameData] = keyframes[index];
+        raceDateLabel.textContent = formatDate(date);
+
+        const displayedData = frameData.slice(0, n);
+
+        raceSvg.selectAll("rect.bar")
+            .data(displayedData, d => d.id)
+            .join(
+                enter => enter.append("rect")
+                    .attr("class", "bar")
+                    .attr("fill", d => color(d.id))
+                    .attr("x", xRace(0))
+                    .attr("y", d => yRace(n))
+                    .attr("height", yRace.bandwidth())
+                    .attr("width", 0),
+                update => update,
+                exit => exit.transition().duration(duration).attr("width", 0).attr("y", yRace(n)).remove()
+            )
+            .transition().duration(duration).ease(d3.easeLinear)
+            .attr("y", (d, i) => yRace(i))
+            .attr("width", d => xRace(d.value) - xRace(0));
+
+        raceSvg.selectAll("text.bar-label")
+            .data(displayedData, d => d.id)
+            .join(
+                enter => enter.append("text")
+                    .attr("class", "bar-label")
+                    .attr("text-anchor", "end")
+                    .attr("x", xRace(0) - 6)
+                    .attr("y", d => yRace(n) + yRace.bandwidth() / 2)
+                    .attr("dy", "0.35em")
+                    .text(d => d.label),
+                update => update,
+                exit => exit.transition().duration(duration).attr("y", yRace(n)).remove()
+            )
+            .transition().duration(duration).ease(d3.easeLinear)
+            .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
+            .text(d => d.label);
+
+        raceSvg.selectAll("text.bar-value")
+            .data(displayedData, d => d.id)
+            .join(
+                enter => enter.append("text")
+                    .attr("class", "bar-value")
+                    .attr("x", d => xRace(0) + 6)
+                    .attr("y", d => yRace(n) + yRace.bandwidth() / 2)
+                    .attr("dy", "0.35em")
+                    .text(d => formatNumber(d.value) + "%"),
+                update => update,
+                exit => exit.transition().duration(duration).attr("y", yRace(n)).remove()
+            )
+            .transition().duration(duration).ease(d3.easeLinear)
+            .attr("x", d => xRace(d.value) + 6)
+            .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
+            .textTween(function(d) {
+                const i = d3.interpolateNumber(parseFloat(this.textContent) || 0, d.value);
+                return t => formatNumber(i(t)) + "%";
+            });
+    }
+
+    raceInterval = d3.interval(() => {
+        renderFrame(k);
+        k++;
+        if (k >= keyframes.length) {
+            raceInterval.stop();
+        }
+    }, duration);
+}
+
 function getSelectedVotes() {
     return votes.slice(state.fromIndex, state.toIndex + 1);
 }
@@ -315,7 +537,7 @@ function update() {
 
     if (top) {
         topCanton.textContent = top.id;
-        topCantonSub.textContent = `${top.label}: ${formatValue(top.score)}`;
+        topCantonSub.textContent = `${top.label}: ${formatValue(top.score)}%`;
     }
 
     // Chart Update: X-Scale anpassen
@@ -385,7 +607,7 @@ function renderRanking(ranking) {
     items.select(".badge").style("display", d => d.FederalCouncillor ? "inline-flex" : "none");
     items.select(".rank-value").text(d => {
         const prefix = state.rankingMode === "change" && d.score > 0 ? "+" : "";
-        return `${prefix}${formatValue(d.score)}`;
+        return `${prefix}${formatValue(d.score)}%`;
     });
 }
 
@@ -422,6 +644,17 @@ function showTooltip(event, cantonSeries) {
     if (!entry) return;
 
     const [mx, my] = d3.pointer(event, document.querySelector(".chart-wrap"));
+    const mouseXDate = x.invert(d3.pointer(event, g.node())[0]);
+
+    // Finde den Datenpunkt, der dem Mauszeiger am nächsten liegt
+    const bisectDate = d3.bisector(d => d.date).left;
+    const idx = bisectDate(cantonSeries.values, mouseXDate, 1);
+    const d0 = cantonSeries.values[idx - 1];
+    const d1 = cantonSeries.values[idx];
+    let closestPoint = d0;
+    if (d1 && (mouseXDate - d0.date > d1.date - mouseXDate)) {
+        closestPoint = d1;
+    }
 
     tooltip
         .classed("visible", true)
@@ -432,9 +665,17 @@ function showTooltip(event, cantonSeries) {
             <img src="${entry.coat}" alt="" />
             <span>#${rank} ${entry.label} (${entry.id})</span>
           </div>
-          <div>${getModeText()}: <strong>${formatValue(entry.score)}</strong></div>
-          <div>Start: ${formatValue(entry.first)} · Ende: ${formatValue(entry.last)}</div>
-          <div>Veränderung: <strong>${entry.change >= 0 ? "+" : ""}${formatValue(entry.change)}</strong></div>
+          ${closestPoint ? `
+            <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(148,163,184,0.2);">
+              <div>Datum: <strong>${formatDate(closestPoint.date)}</strong></div>
+              <div>Wert: <strong style="color:var(--accent); font-size: 1.1em;">${formatValue(closestPoint.value)}%</strong></div>
+            </div>
+          ` : ""}
+          <div style="font-size: 0.9em; opacity: 0.8;">
+            <div>${getModeText()}: <strong>${formatValue(entry.score)}</strong></div>
+            <div>Bereich: ${formatValue(entry.first)} bis ${formatValue(entry.last)}</div>
+            <div>Veränderung: <strong>${entry.change >= 0 ? "+" : ""}${formatValue(entry.change)}</strong></div>
+          </div>
         `);
 }
 

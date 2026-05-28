@@ -49,11 +49,28 @@
                     <option value="change">Ranking: Veränderung</option>
                 </select>
                 <button id="resetButton" type="button">Reset</button>
+                <button id="playRaceButton" type="button" class="btn-primary">▶ Race starten</button>
             </div>
         </div>
     </section>
 
     <section class="dashboard">
+        <article class="chart-card race-card" id="raceContainer" style="display: none;">
+            <div class="card-header">
+                <div>
+                    <h2>Bar Chart Race</h2>
+                    <p>Entwicklung der Stimmbeteiligung (gleitender Durchschnitt über 10 Abstimmungen).</p>
+                </div>
+                <div class="race-controls">
+                    <span id="raceDateLabel" class="race-date"></span>
+                    <button id="stopRaceButton" type="button">✖ Schliessen</button>
+                </div>
+            </div>
+            <div class="chart-wrap">
+                <svg id="raceChart" viewBox="0 0 980 600"></svg>
+            </div>
+        </article>
+
         <article class="chart-card">
             <div class="card-header">
                 <div>
