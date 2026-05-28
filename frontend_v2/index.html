@@ -28,6 +28,26 @@
     </header>
 
     <section class="dashboard">
+        <article class="chart-card rank-timeline-card">
+            <div class="card-header">
+                <div>
+                    <h2>Rangverlauf Pro Abstimmung</h2>
+                    <p>Pro Votation wird jeder Kanton als Wappen auf seiner Rangposition dargestellt.</p>
+                </div>
+                <div class="rank-timeline-controls">
+                    <select id="rankAggregation" title="Aggregation für Rangverlauf">
+                        <option value="all" selected>Alle Votationen</option>
+                        <option value="1y">1 Jahr aggregiert</option>
+                        <option value="5y">5 Jahre aggregiert</option>
+                        <option value="10y">10 Jahre aggregiert</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-wrap rank-timeline-wrap">
+                <svg id="rankTimelineChart" viewBox="0 0 980 560" role="img" aria-label="Rangverlauf der Kantone je Abstimmungsdatum"></svg>
+            </div>
+        </article>
+
         <article class="chart-card race-card" id="raceContainer">
             <div class="card-header">
                 <div>

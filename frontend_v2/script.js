@@ -50,13 +50,21 @@ const formatValue = d3.format(".1f");
 
 // DOM + D3 Globals
 const svg = d3.select("#chart");
+const rankTimelineSvg = d3.select("#rankTimelineChart");
 const tooltip = d3.select("#tooltip");
 const rankingList = d3.select("#rankingList");
+const lineChartWrap = document.querySelector("#chart")?.closest(".chart-wrap");
+const lineHoverDateBox = document.createElement("div");
+lineHoverDateBox.className = "line-hover-date-box";
+if (lineChartWrap) {
+    lineChartWrap.appendChild(lineHoverDateBox);
+}
 
 const fromSlider = document.querySelector("#fromSlider");
 const toSlider = document.querySelector("#toSlider");
 const rangeLabel = document.querySelector("#rangeLabel");
 const rankingMode = document.querySelector("#rankingMode");
+const rankAggregationSelect = document.querySelector("#rankAggregation");
 const resetButton = document.querySelector("#resetButton");
 const replayRaceButton = document.querySelector("#replayRaceButton");
 const pauseRaceButton = document.querySelector("#pauseRaceButton");
@@ -131,32 +139,32 @@ GROUP BY ?date ?region
 ORDER BY DESC(?date) ?region`;
 
 const cantonMap = {
-    'https://ld.admin.ch/canton/1': { id: 'ZH', label: 'Zürich', councillor: 1 },
-    'https://ld.admin.ch/canton/2': { id: 'BE', label: 'Bern', councillor: 1 },
-    'https://ld.admin.ch/canton/3': { id: 'LU', label: 'Luzern', councillor: 0 },
-    'https://ld.admin.ch/canton/4': { id: 'UR', label: 'Uri', councillor: 0 },
-    'https://ld.admin.ch/canton/5': { id: 'SZ', label: 'Schwyz', councillor: 0 },
-    'https://ld.admin.ch/canton/6': { id: 'OW', label: 'Obwalden', councillor: 0 },
-    'https://ld.admin.ch/canton/7': { id: 'NW', label: 'Nidwalden', councillor: 0 },
-    'https://ld.admin.ch/canton/8': { id: 'GL', label: 'Glarus', councillor: 0 },
-    'https://ld.admin.ch/canton/9': { id: 'ZG', label: 'Zug', councillor: 0 },
-    'https://ld.admin.ch/canton/10': { id: 'FR', label: 'Freiburg', councillor: 1 },
-    'https://ld.admin.ch/canton/11': { id: 'SO', label: 'Solothurn', councillor: 0 },
-    'https://ld.admin.ch/canton/12': { id: 'BS', label: 'Basel-Stadt', councillor: 1 },
-    'https://ld.admin.ch/canton/13': { id: 'BL', label: 'Basel-Landschaft', councillor: 0 },
-    'https://ld.admin.ch/canton/14': { id: 'SH', label: 'Schaffhausen', councillor: 0 },
-    'https://ld.admin.ch/canton/15': { id: 'AR', label: 'Appenzell Ausserrhoden', councillor: 0 },
-    'https://ld.admin.ch/canton/16': { id: 'AI', label: 'Appenzell Innerrhoden', councillor: 0 },
-    'https://ld.admin.ch/canton/17': { id: 'SG', label: 'St. Gallen', councillor: 1 },
-    'https://ld.admin.ch/canton/18': { id: 'GR', label: 'Graubünden', councillor: 0 },
-    'https://ld.admin.ch/canton/19': { id: 'AG', label: 'Aargau', councillor: 0 },
-    'https://ld.admin.ch/canton/20': { id: 'TG', label: 'Thurgau', councillor: 0 },
-    'https://ld.admin.ch/canton/21': { id: 'TI', label: 'Tessin', councillor: 1 },
-    'https://ld.admin.ch/canton/22': { id: 'VD', label: 'Waadt', councillor: 1 },
-    'https://ld.admin.ch/canton/23': { id: 'VS', label: 'Wallis', councillor: 1 },
-    'https://ld.admin.ch/canton/24': { id: 'NE', label: 'Neuenburg', councillor: 0 },
-    'https://ld.admin.ch/canton/25': { id: 'GE', label: 'Genf', councillor: 0 },
-    'https://ld.admin.ch/canton/26': { id: 'JU', label: 'Jura', councillor: 0 }
+    'https://ld.admin.ch/canton/1': { id: 'ZH', label: 'Zürich' },
+    'https://ld.admin.ch/canton/2': { id: 'BE', label: 'Bern' },
+    'https://ld.admin.ch/canton/3': { id: 'LU', label: 'Luzern' },
+    'https://ld.admin.ch/canton/4': { id: 'UR', label: 'Uri' },
+    'https://ld.admin.ch/canton/5': { id: 'SZ', label: 'Schwyz' },
+    'https://ld.admin.ch/canton/6': { id: 'OW', label: 'Obwalden' },
+    'https://ld.admin.ch/canton/7': { id: 'NW', label: 'Nidwalden' },
+    'https://ld.admin.ch/canton/8': { id: 'GL', label: 'Glarus' },
+    'https://ld.admin.ch/canton/9': { id: 'ZG', label: 'Zug' },
+    'https://ld.admin.ch/canton/10': { id: 'FR', label: 'Freiburg' },
+    'https://ld.admin.ch/canton/11': { id: 'SO', label: 'Solothurn' },
+    'https://ld.admin.ch/canton/12': { id: 'BS', label: 'Basel-Stadt' },
+    'https://ld.admin.ch/canton/13': { id: 'BL', label: 'Basel-Landschaft' },
+    'https://ld.admin.ch/canton/14': { id: 'SH', label: 'Schaffhausen' },
+    'https://ld.admin.ch/canton/15': { id: 'AR', label: 'Appenzell Ausserrhoden' },
+    'https://ld.admin.ch/canton/16': { id: 'AI', label: 'Appenzell Innerrhoden' },
+    'https://ld.admin.ch/canton/17': { id: 'SG', label: 'St. Gallen' },
+    'https://ld.admin.ch/canton/18': { id: 'GR', label: 'Graubünden' },
+    'https://ld.admin.ch/canton/19': { id: 'AG', label: 'Aargau' },
+    'https://ld.admin.ch/canton/20': { id: 'TG', label: 'Thurgau' },
+    'https://ld.admin.ch/canton/21': { id: 'TI', label: 'Tessin' },
+    'https://ld.admin.ch/canton/22': { id: 'VD', label: 'Waadt' },
+    'https://ld.admin.ch/canton/23': { id: 'VS', label: 'Wallis' },
+    'https://ld.admin.ch/canton/24': { id: 'NE', label: 'Neuenburg' },
+    'https://ld.admin.ch/canton/25': { id: 'GE', label: 'Genf' },
+    'https://ld.admin.ch/canton/26': { id: 'JU', label: 'Jura' }
 };
 
 async function fetchLiveResults() {
@@ -185,8 +193,8 @@ function transformSparqlData(sparqlResult) {
         if (!groupedByDate[date]) {
             groupedByDate[date] = { id: `${date}-vote`, date: date, title: `Popular Vote on ${date}`, cantons: [] };
         }
-        const cantonInfo = cantonMap[regionUri] || { id: regionUri.split('/').pop(), label: regionUri.split('/').pop(), councillor: 0 };
-        groupedByDate[date].cantons.push({ id: cantonInfo.id, label: cantonInfo.label, value: participation, FederalCouncillor: cantonInfo.councillor });
+        const cantonInfo = cantonMap[regionUri] || { id: regionUri.split('/').pop(), label: regionUri.split('/').pop() };
+        groupedByDate[date].cantons.push({ id: cantonInfo.id, label: cantonInfo.label, value: participation });
     });
     return Object.values(groupedByDate).sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -215,7 +223,6 @@ function init(rawData) {
             id: canton.id,
             label: canton.label,
             value: Number(canton.value),
-            FederalCouncillor: Number(canton.FederalCouncillor ?? 0),
             coat: coatOfArms[canton.id] ?? fallbackCoat
         }));
     }).sort((a, b) => d3.ascending(a.date, b.date));
@@ -230,7 +237,6 @@ function init(rawData) {
         ([id, values]) => ({
             id,
             label: values[0]?.label ?? id,
-            FederalCouncillor: values.some(d => d.FederalCouncillor === 1) ? 1 : 0,
             coat: values[0]?.coat ?? fallbackCoat,
             values: values.sort((a, b) => d3.ascending(a.date, b.date))
         })
@@ -308,8 +314,241 @@ function init(rawData) {
         .attr("x", d => x(d.values.at(-1).date) + 8)
         .attr("y", d => y(d.values.at(-1).value));
 
+    renderRankTimeline();
     update();
     startRace(false);
+}
+
+function getRankTimelineBuckets(mode) {
+    if (mode === "1y") return 1;
+    if (mode === "5y") return 5;
+    if (mode === "10y") return 10;
+    return 0;
+}
+
+function buildRankTimelineVotes(mode) {
+    const bucketYears = getRankTimelineBuckets(mode);
+
+    if (!bucketYears) {
+        return votes.map(vote => ({
+            key: vote.date,
+            label: vote.dateLabel,
+            cantons: (vote.cantons || []).map(canton => ({
+                id: canton.id,
+                label: canton.label,
+                value: Number(canton.value)
+            }))
+        }));
+    }
+
+    if (!votes.length) return [];
+
+    const firstYear = d3.min(votes, vote => vote.dateObj.getFullYear());
+    const buckets = new Map();
+
+    for (const vote of votes) {
+        const year = vote.dateObj.getFullYear();
+        const bucketIndex = Math.floor((year - firstYear) / bucketYears);
+        const startYear = firstYear + bucketIndex * bucketYears;
+        const endYear = startYear + bucketYears - 1;
+        const bucketKey = `${startYear}-${endYear}`;
+
+        if (!buckets.has(bucketKey)) {
+            buckets.set(bucketKey, {
+                key: bucketKey,
+                label: bucketYears === 1 ? `${startYear}` : `${startYear}-${endYear}`,
+                byCanton: new Map()
+            });
+        }
+
+        const bucket = buckets.get(bucketKey);
+        for (const canton of (vote.cantons || [])) {
+            const current = bucket.byCanton.get(canton.id) || { id: canton.id, label: canton.label, sum: 0, count: 0 };
+            current.sum += Number(canton.value);
+            current.count += 1;
+            bucket.byCanton.set(canton.id, current);
+        }
+    }
+
+    return Array.from(buckets.values()).map(bucket => ({
+        key: bucket.key,
+        label: bucket.label,
+        cantons: Array.from(bucket.byCanton.values()).map(canton => ({
+            id: canton.id,
+            label: canton.label,
+            value: canton.count > 0 ? canton.sum / canton.count : 0
+        }))
+    }));
+}
+
+function renderRankTimeline() {
+    if (!rankTimelineSvg.node() || votes.length === 0) return;
+
+    const aggregationMode = rankAggregationSelect?.value || "all";
+    const timelineVotes = buildRankTimelineVotes(aggregationMode);
+    if (!timelineVotes.length) return;
+
+    const xStep = 56;
+    const minWidth = 980;
+    const dynamicPlotWidth = Math.max(0, (timelineVotes.length - 1) * xStep);
+    const width = Math.max(minWidth, 64 + dynamicPlotWidth + 24);
+    const height = 700;
+    const margin = { top: 24, right: 24, bottom: 90, left: 64 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+
+    rankTimelineSvg
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .attr("width", width)
+        .attr("height", height)
+        .style("width", `${width}px`)
+        .style("height", `${height}px`);
+
+    const frames = timelineVotes.map(vote => {
+        const ranked = (vote.cantons || [])
+            .map(c => ({ ...c, value: Number(c.value) }))
+            .sort((a, b) => d3.descending(a.value, b.value));
+
+        return ranked.map((canton, index) => ({
+            xKey: vote.key,
+            rank: index + 1,
+            id: canton.id,
+            coat: coatOfArms[canton.id] || fallbackCoat
+        }));
+    });
+
+    const points = frames.flat();
+    const top3ByDate = new Map(
+        timelineVotes.map((vote, i) => {
+            const top3Ids = (frames[i] || []).slice(0, 3).map(d => d.id);
+            return [vote.key, top3Ids];
+        })
+    );
+    const maxRank = d3.max(points, d => d.rank) || 1;
+
+    rankTimelineSvg.selectAll("*").remove();
+
+    const gRank = rankTimelineSvg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const xRank = d3.scalePoint()
+        .domain(timelineVotes.map(v => v.key))
+        .range([0, chartWidth])
+        .padding(0.4);
+
+    const yRank = d3.scaleLinear()
+        .domain([1, maxRank + 1])
+        .range([0, chartHeight]);
+
+    const xTickValues = timelineVotes.map(v => v.key);
+    const tickLabelByKey = new Map(timelineVotes.map(v => [v.key, v.label]));
+
+    gRank.append("g")
+        .attr("class", "grid")
+        .call(d3.axisLeft(yRank).ticks(maxRank).tickSize(-chartWidth).tickFormat(""));
+
+    gRank.append("g")
+        .attr("class", "axis y-axis")
+        .call(d3.axisLeft(yRank).tickValues(d3.range(1, maxRank + 1)).tickFormat(d => `#${d}`));
+
+    gRank.append("g")
+        .attr("class", "axis x-axis")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(xRank).tickValues(xTickValues).tickFormat(d => tickLabelByKey.get(d) || d))
+        .selectAll("text")
+        .style("text-anchor", "end")
+        .attr("dx", "-0.7em")
+        .attr("dy", "0.1em")
+        .attr("transform", "rotate(-55)");
+
+    const pointsByCanton = Array.from(
+        d3.group(points, d => d.id),
+        ([id, values]) => ({
+            id,
+            values: values.sort((a, b) => d3.ascending(xTickValues.indexOf(a.xKey), xTickValues.indexOf(b.xKey)))
+        })
+    );
+
+    const rankPath = d3.line()
+        .x(d => xRank(d.xKey))
+        .y(d => yRank(d.rank));
+
+    gRank.append("g")
+        .attr("class", "rank-progress-group")
+        .selectAll("path.rank-progress-line")
+        .data(pointsByCanton, d => d.id)
+        .join("path")
+        .attr("class", "rank-progress-line")
+        .attr("data-canton-id", d => d.id)
+        .attr("d", d => rankPath(d.values))
+        .attr("stroke", d => color(d.id));
+
+    gRank.selectAll("image.rank-mark")
+        .data(points)
+        .join("image")
+        .attr("class", "rank-mark")
+        .attr("href", d => d.coat)
+        .attr("x", d => xRank(d.xKey) - 9)
+        .attr("y", d => yRank(d.rank) - 9)
+        .attr("width", 18)
+        .attr("height", 18);
+
+    const hoverLayer = gRank.append("rect")
+        .attr("class", "rank-hover-layer")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", chartWidth)
+        .attr("height", chartHeight)
+        .attr("fill", "transparent")
+        .attr("pointer-events", "all");
+
+    const rankLines = gRank.selectAll("path.rank-progress-line");
+
+    function updateTop3LinesForNearestHover(mouseX, mouseY) {
+        let nearestKey = xTickValues[0];
+        let bestDistance = Infinity;
+
+        for (const tickKey of xTickValues) {
+            const px = xRank(tickKey);
+            const distance = Math.abs(px - mouseX);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                nearestKey = tickKey;
+            }
+        }
+
+        const activeTop3 = new Set(top3ByDate.get(nearestKey) || []);
+        let nearestCantonId = null;
+        let bestPointDistance = Infinity;
+
+        for (const point of points) {
+            const px = xRank(point.xKey);
+            const py = yRank(point.rank);
+            const distance = Math.hypot(px - mouseX, py - mouseY);
+            if (distance < bestPointDistance) {
+                bestPointDistance = distance;
+                nearestCantonId = point.id;
+            }
+        }
+
+        if (nearestCantonId) {
+            activeTop3.add(nearestCantonId);
+        }
+
+        rankLines.classed("is-active", d => activeTop3.has(d.id));
+    }
+
+    hoverLayer
+        .on("pointerenter", (event) => {
+            const [mx, my] = d3.pointer(event, gRank.node());
+            updateTop3LinesForNearestHover(mx, my);
+        })
+        .on("pointermove", (event) => {
+            const [mx, my] = d3.pointer(event, gRank.node());
+            updateTop3LinesForNearestHover(mx, my);
+        })
+        .on("pointerleave", () => {
+            rankLines.classed("is-active", false);
+        });
 }
 
 function updateSliderTrack() {
@@ -414,6 +653,12 @@ rankingMode.addEventListener("change", () => {
     state.rankingMode = rankingMode.value;
     update();
 });
+
+if (rankAggregationSelect) {
+    rankAggregationSelect.addEventListener("change", () => {
+        renderRankTimeline();
+    });
+}
 
 resetButton.addEventListener("click", () => {
     state = { fromIndex: 0, toIndex: votes.length - 1, rankingMode: rankingMode.value };
@@ -692,7 +937,6 @@ function getRanking() {
             id,
             label: first.label,
             coat: first.coat,
-            FederalCouncillor: values.some(d => d.FederalCouncillor === 1) ? 1 : 0,
             score,
             avg,
             end: last.value,
@@ -771,7 +1015,6 @@ function renderRanking(ranking) {
                 const name = item.append("div");
                 name.append("div").attr("class", "canton-name");
                 name.append("div").attr("class", "canton-code");
-                name.append("div").attr("class", "badge").text("Bundesrat/-rätin");
 
                 item.append("div").attr("class", "rank-value");
                 return item;
@@ -789,7 +1032,6 @@ function renderRanking(ranking) {
     items.select("img").attr("src", d => d.coat).attr("alt", d => `${d.label} Wappen`);
     items.select(".canton-name").text(d => d.label);
     items.select(".canton-code").text(d => d.id);
-    items.select(".badge").style("display", d => d.FederalCouncillor ? "inline-flex" : "none");
     items.select(".rank-value").text(d => {
         const prefix = state.rankingMode === "change" && d.score > 0 ? "+" : "";
         return `${prefix}${formatValue(d.score)}%`;
@@ -802,6 +1044,7 @@ function setActiveCanton(id, event = null) {
 
     if (!id) {
         tooltip.classed("visible", false);
+        lineHoverDateBox.classList.remove("visible");
         return;
     }
 
@@ -823,12 +1066,7 @@ function updateActiveStyles() {
 }
 
 function showTooltip(event, cantonSeries) {
-    const ranking = getRanking();
-    const rank = ranking.findIndex(d => d.id === cantonSeries.id) + 1;
-    const entry = ranking.find(d => d.id === cantonSeries.id);
-    if (!entry) return;
-
-    const [mx, my] = d3.pointer(event, document.querySelector(".chart-wrap"));
+    const [mx, my] = d3.pointer(event, lineChartWrap);
     const mouseXDate = x.invert(d3.pointer(event, g.node())[0]);
 
     // Finde den Datenpunkt, der dem Mauszeiger am nächsten liegt
@@ -841,27 +1079,15 @@ function showTooltip(event, cantonSeries) {
         closestPoint = d1;
     }
 
-    tooltip
-        .classed("visible", true)
-        .style("left", `${mx}px`)
-        .style("top", `${my}px`)
-        .html(`
-          <div class="tooltip-title">
-            <img src="${entry.coat}" alt="" />
-            <span>#${rank} ${entry.label} (${entry.id})</span>
-          </div>
-          ${closestPoint ? `
-            <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(148,163,184,0.2);">
-              <div>Datum: <strong>${formatDate(closestPoint.date)}</strong></div>
-              <div>Wert: <strong style="color:var(--accent); font-size: 1.1em;">${formatValue(closestPoint.value)}%</strong></div>
-            </div>
-          ` : ""}
-          <div style="font-size: 0.9em; opacity: 0.8;">
-            <div>${getModeText()}: <strong>${formatValue(entry.score)}</strong></div>
-            <div>Bereich: ${formatValue(entry.first)} bis ${formatValue(entry.last)}</div>
-            <div>Veränderung: <strong>${entry.change >= 0 ? "+" : ""}${formatValue(entry.change)}</strong></div>
-          </div>
-        `);
+    if (closestPoint && lineChartWrap) {
+        const hoverX = x(closestPoint.date) + margin.left;
+        lineHoverDateBox.textContent = `Votation: ${formatDate(closestPoint.date)}`;
+        lineHoverDateBox.style.left = `${hoverX}px`;
+        lineHoverDateBox.style.top = `${my}px`;
+        lineHoverDateBox.classList.add("visible");
+    }
+
+        tooltip.classed("visible", false);
 }
 
 // update wird in init() aufgerufen

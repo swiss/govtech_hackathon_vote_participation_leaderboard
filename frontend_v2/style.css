@@ -444,6 +444,27 @@ svg {
     color: var(--accent);
 }
 
+.line-hover-date-box {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 12px);
+    transition: opacity 120ms ease;
+    background: var(--panel);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+    padding: 6px 10px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+    z-index: 11;
+}
+
+.line-hover-date-box.visible {
+    opacity: 1;
+}
+
 .ranking-list {
     flex: 1 1 0px;
     overflow-y: auto;
@@ -561,6 +582,41 @@ svg {
     background: var(--panel);
     border: var(--border-width) solid var(--border);
     box-shadow: var(--shadow);
+}
+
+.rank-timeline-card {
+    grid-column: 1 / -1;
+    margin-bottom: 32px;
+}
+
+.rank-timeline-controls {
+    min-width: 240px;
+}
+
+.rank-timeline-wrap {
+    overflow-x: auto;
+}
+
+#rankTimelineChart {
+    display: block;
+    width: max-content;
+}
+
+#rankTimelineChart .rank-mark {
+    paint-order: stroke;
+}
+
+#rankTimelineChart .rank-progress-line {
+    fill: none;
+    stroke-width: 4px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+#rankTimelineChart .rank-progress-line.is-active {
+    opacity: 0.85;
 }
 
 .race-controls {
