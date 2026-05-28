@@ -23,11 +23,11 @@ The input should be a JSON array of vote objects.
     "date": "2026-05-17",
     "title": "Federal Act on Research and Innovation",
     "cantons": [
-      { "id": "ZH", "label": "Zürich", "value": 61.2 },
-      { "id": "BE", "label": "Bern", "value": 54.5 },
-      { "id": "LU", "label": "Luzern", "value": 58.1 },
-      { "id": "UR", "label": "Uri", "value": 49.3 },
-      { "id": "SZ", "label": "Schwyz", "value": 52.8 }
+      { "id": "ZH", "label": "Zürich", "value": 61.2, "FederalCouncillor": 0 },
+      { "id": "BE", "label": "Bern", "value": 54.5, "FederalCouncillor": 1  },
+      { "id": "LU", "label": "Luzern", "value": 58.1, "FederalCouncillor": 0  },
+      { "id": "UR", "label": "Uri", "value": 49.3, "FederalCouncillor": 0  },
+      { "id": "SZ", "label": "Schwyz", "value": 52.8, "FederalCouncillor": 0  }
     ]
   },
   {
@@ -35,11 +35,11 @@ The input should be a JSON array of vote objects.
     "date": "2026-05-17",
     "title": "Corporate Tax Reform",
     "cantons": [
-      { "id": "ZH", "label": "Zürich", "value": 59.4 },
-      { "id": "BE", "label": "Bern", "value": 52.1 },
-      { "id": "LU", "label": "Luzern", "value": 55.7 },
-      { "id": "UR", "label": "Uri", "value": 46.2 },
-      { "id": "SZ", "label": "Schwyz", "value": 50.1 }
+      { "id": "ZH", "label": "Zürich", "value": 59.4, "FederalCouncillor": 0 },
+      { "id": "BE", "label": "Bern", "value": 52.1, "FederalCouncillor": 1 },
+      { "id": "LU", "label": "Luzern", "value": 55.7, "FederalCouncillor": 0 },
+      { "id": "UR", "label": "Uri", "value": 46.2, "FederalCouncillor": 0 },
+      { "id": "SZ", "label": "Schwyz", "value": 50.1, "FederalCouncillor": 0 }
     ]
   }
 ]
