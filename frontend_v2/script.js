@@ -7,9 +7,28 @@ const coatOfArms = {
     BE: "assets/cantons/be.svg",
     LU: "assets/cantons/lu.svg",
     UR: "assets/cantons/ur.svg",
-    SZ: "assets/cantons/sz.svg"
-    // AG: "assets/cantons/ag.svg",
-    // ... alle 26 Kantone ergänzen
+    SZ: "assets/cantons/sz.svg",
+    OW: "assets/cantons/ow.svg",
+    NW: "assets/cantons/nw.svg",
+    GL: "assets/cantons/gl.svg",
+    ZG: "assets/cantons/zg.svg",
+    FR: "assets/cantons/fr.svg",
+    SO: "assets/cantons/so.svg",
+    BS: "assets/cantons/bs.svg",
+    BL: "assets/cantons/bl.svg",
+    SH: "assets/cantons/sh.svg",
+    AR: "assets/cantons/ar.svg",
+    AI: "assets/cantons/ai.svg",
+    SG: "assets/cantons/sg.svg",
+    GR: "assets/cantons/gr.svg",
+    AG: "assets/cantons/ag.svg",
+    TG: "assets/cantons/tg.svg",
+    TI: "assets/cantons/ti.svg",
+    VD: "assets/cantons/vd.svg",
+    VS: "assets/cantons/vs.svg",
+    NE: "assets/cantons/ne.svg",
+    GE: "assets/cantons/ge.svg",
+    JU: "assets/cantons/ju.svg"
 };
 
 const fallbackCoat = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23fff'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Arial' font-size='18' font-weight='700' fill='%23111827'%3ECH%3C/text%3E%3C/svg%3E";
@@ -305,6 +324,68 @@ function updateSliderTrack() {
     sliderTrackActive.style.left = Math.min(percent1, percent2) + "%";
     sliderTrackActive.style.width = Math.abs(percent2 - percent1) + "%";
 }
+
+let isRangeWindowDragging = false;
+let dragStartX = 0;
+let dragStartFromIndex = 0;
+
+function shiftRangeWindowByPointer(clientX) {
+    const min = Number(fromSlider.min);
+    const max = Number(fromSlider.max);
+    const totalSteps = max - min;
+    const currentWindowSize = state.toIndex - state.fromIndex;
+    const maxFrom = max - currentWindowSize;
+    const containerRect = sliderContainer.getBoundingClientRect();
+
+    if (totalSteps <= 0 || containerRect.width <= 0) return;
+
+    const deltaX = clientX - dragStartX;
+    const deltaSteps = Math.round((deltaX / containerRect.width) * totalSteps);
+    const nextFrom = Math.min(Math.max(dragStartFromIndex + deltaSteps, min), maxFrom);
+    const nextTo = nextFrom + currentWindowSize;
+
+    if (nextFrom === state.fromIndex && nextTo === state.toIndex) return;
+
+    state.fromIndex = nextFrom;
+    state.toIndex = nextTo;
+    fromSlider.value = state.fromIndex;
+    toSlider.value = state.toIndex;
+    updateSliderTrack();
+    update();
+}
+
+sliderTrackActive.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    isRangeWindowDragging = true;
+    dragStartX = event.clientX;
+    dragStartFromIndex = state.fromIndex;
+    sliderTrackActive.classList.add("is-dragging");
+    if (sliderTrackActive.setPointerCapture) {
+        sliderTrackActive.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+});
+
+sliderTrackActive.addEventListener("pointermove", (event) => {
+    if (!isRangeWindowDragging) return;
+    shiftRangeWindowByPointer(event.clientX);
+});
+
+function endRangeWindowDrag(event) {
+    if (!isRangeWindowDragging) return;
+    isRangeWindowDragging = false;
+    sliderTrackActive.classList.remove("is-dragging");
+    if (event && sliderTrackActive.releasePointerCapture) {
+        try {
+            sliderTrackActive.releasePointerCapture(event.pointerId);
+        } catch (e) {
+            // Ignore if pointer was already released.
+        }
+    }
+}
+
+sliderTrackActive.addEventListener("pointerup", endRangeWindowDrag);
+sliderTrackActive.addEventListener("pointercancel", endRangeWindowDrag);
 
 // -------------------------------------------------------------------------
 // 6) Interaktion

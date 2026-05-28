@@ -212,6 +212,11 @@ h1 {
     border-top: 2px solid var(--border);
     border-bottom: 2px solid var(--border);
     z-index: 1;
+    cursor: grab;
+}
+
+.slider-track-active.is-dragging {
+    cursor: grabbing;
 }
 
 .control-group label {
