@@ -1,0 +1,46 @@
+* { font-family: "Source Sans Pro", "Arial", sans-serif; }
+body, html, #root {
+  margin: 0; padding: 0; height: 100%;
+  background: #3d76c1;
+}
+
+.wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: start;
+  padding-top: 3rem;
+}
+.app {
+  padding: 2rem 4rem;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0px 3px 30px rgba(0, 0, 0, 0.7);
+  box-sizing: border-box;
+  z-index: 2;
+
+  /* DO NOT FORGET TO SET DEFAULT WIDTH AND MAX WIDTH ! */
+  max-width: 700px;
+  width: 100%;
+}
+
+.button {
+  display: flex;
+  justify-content: center;
+  margin-top: 3rem;
+}
+
+button {
+  background: #3d76c1;
+  border: none;
+  padding: 1rem 3rem;
+  border-radius: 8px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background linear 150ms;
+  font-size: 1.1rem;
+}
+
+button:hover {
+  background: #265faa;
+}
