@@ -35,10 +35,13 @@ def main():
         # Assume it's SSML if it ends with .xml, otherwise text
         is_ssml = custom_path.lower().endswith(".xml")
     else:
+        ssml_path_v3 = os.path.join(base_dir, "tts_script_kantonsrennen_ssml_v3.xml")
         ssml_path_1998_2008_fast = os.path.join(base_dir, "tts_script_kantonsrennen_1998_2008_30s_sportmoderator_fast_ssml.xml")
         ssml_path_1989_2008 = os.path.join(base_dir, "tts_script_kantonsrennen_1989_2008_ssml.xml")
         ssml_path_v2 = os.path.join(base_dir, "tts_script_kantonsrennen_ssml_v2.xml")
-        if os.path.exists(ssml_path_1998_2008_fast):
+        if os.path.exists(ssml_path_v3):
+            ssml_path = ssml_path_v3
+        elif os.path.exists(ssml_path_1998_2008_fast):
             ssml_path = ssml_path_1998_2008_fast
         elif os.path.exists(ssml_path_1989_2008):
             ssml_path = ssml_path_1989_2008
