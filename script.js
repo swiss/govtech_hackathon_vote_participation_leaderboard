@@ -744,27 +744,57 @@ async function startRace(startImmediately = true) {
     raceKeyframes = [];
     const windowSize = 10; // Durchschnitt über die letzten 10 Abstimmungen
 
-    for (let i = 0; i < votes.length; i++) {
-        const start = Math.max(0, i - windowSize + 1);
-        const windowVotes = votes.slice(start, i + 1);
-        
-        // Berechne Durchschnitt für jeden Kanton in diesem Fenster
-        const cantonAverages = cantonIds.map(cid => {
-            const values = windowVotes.map(v => v.cantons.find(c => c.id === cid)?.value).filter(v => v !== undefined);
-            const avg = values.length > 0 ? d3.mean(values) : 0;
-            const label = windowVotes[windowVotes.length - 1].cantons.find(c => c.id === cid)?.label || cid;
-            return { id: cid, label: label, value: avg };
-        });
+    let raceVotes = votes;
+    let currentRaceSpeed = raceSpeed;
 
-        const sortedCantons = cantonAverages.sort((a, b) => d3.descending(a.value, b.value));
-        raceKeyframes.push([votes[i].dateObj, sortedCantons]);
+    if (funModeToggle && funModeToggle.checked) {
+        const startDate = new Date("2002-03-03");
+        const endDate = new Date("2008-02-24");
+        raceVotes = votes.filter(v => v.dateObj >= startDate && v.dateObj <= endDate);
+        // The total animation duration should be exactly 36 seconds (36000 ms)
+        currentRaceSpeed = 36000 / raceVotes.length;
+    }
+
+    for (let i = 0; i < raceVotes.length; i++) {
+        const currentVote = raceVotes[i];
+        let frameCantons;
+
+        if (funModeToggle && funModeToggle.checked) {
+            // Einzelwerte (kein gleitender Durchschnitt) im Fun Mode
+            frameCantons = cantonIds.map(cid => {
+                const canton = currentVote.cantons.find(c => c.id === cid);
+                return {
+                    id: cid,
+                    label: canton?.label || cid,
+                    value: canton ? Number(canton.value) : 0
+                };
+            });
+        } else {
+            // Finde den echten Index in `votes`, um den gleitenden Durchschnitt über *alle* vorangegangenen Abstimmungen (auch vor 2002) korrekt zu berechnen.
+            const currentVoteDate = currentVote.dateObj;
+            const originalIndex = votes.findIndex(v => v.dateObj.getTime() === currentVoteDate.getTime());
+            
+            const start = Math.max(0, originalIndex - windowSize + 1);
+            const windowVotes = votes.slice(start, originalIndex + 1);
+            
+            // Berechne Durchschnitt für jeden Kanton in diesem Fenster
+            frameCantons = cantonIds.map(cid => {
+                const values = windowVotes.map(v => v.cantons.find(c => c.id === cid)?.value).filter(v => v !== undefined);
+                const avg = values.length > 0 ? d3.mean(values) : 0;
+                const label = windowVotes[windowVotes.length - 1].cantons.find(c => c.id === cid)?.label || cid;
+                return { id: cid, label: label, value: avg };
+            });
+        }
+
+        const sortedCantons = frameCantons.sort((a, b) => d3.descending(a.value, b.value));
+        raceKeyframes.push([currentVote.dateObj, sortedCantons]);
     }
 
     function runRaceInterval() {
         if (raceInterval) {
             raceInterval.stop();
         }
-        const transitionDuration = Math.max(70, raceSpeed - 40);
+        const transitionDuration = Math.max(70, currentRaceSpeed - 40);
 
         raceInterval = d3.interval(() => {
             if (raceIsPaused) return;
@@ -777,7 +807,7 @@ async function startRace(startImmediately = true) {
                     pauseRaceButton.textContent = "↺ Wiederholen";
                 }
             }
-        }, raceSpeed);
+        }, currentRaceSpeed);
     }
 
     globalTogglePause = () => {
