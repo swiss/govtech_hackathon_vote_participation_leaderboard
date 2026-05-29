@@ -25,9 +25,12 @@ def main():
         return
 
     sys_prompt_path = os.path.join(base_dir, "tts_script_kantonsrennen_systemprompt.txt")
+    ssml_path_1998_2008_fast = os.path.join(base_dir, "tts_script_kantonsrennen_1998_2008_30s_sportmoderator_fast_ssml.xml")
     ssml_path_1989_2008 = os.path.join(base_dir, "tts_script_kantonsrennen_1989_2008_ssml.xml")
     ssml_path_v2 = os.path.join(base_dir, "tts_script_kantonsrennen_ssml_v2.xml")
-    if os.path.exists(ssml_path_1989_2008):
+    if os.path.exists(ssml_path_1998_2008_fast):
+        ssml_path = ssml_path_1998_2008_fast
+    elif os.path.exists(ssml_path_1989_2008):
         ssml_path = ssml_path_1989_2008
     elif os.path.exists(ssml_path_v2):
         ssml_path = ssml_path_v2
