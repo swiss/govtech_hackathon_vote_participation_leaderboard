@@ -90,7 +90,7 @@ h1 {
 
 /* Metric Card */
 .metric-card {
-    background: var(--accent-light);
+    background: var(--panel);
     border: var(--border-width) solid var(--border);
     border-radius: var(--radius);
     padding: 24px;
@@ -507,7 +507,7 @@ svg {
 
 .rank-item:hover,
 .rank-item.is-active {
-    background: var(--accent-light);
+    background: var(--panel);
     transform: translate(-2px, -2px);
     box-shadow: var(--shadow-sm);
 }
@@ -647,7 +647,7 @@ svg {
     font-weight: 900;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
-    background: var(--accent-light);
+    background: var(--panel);
     padding: 4px 12px;
     border-radius: 6px;
     border: 1.5px solid var(--border);
@@ -746,10 +746,13 @@ svg {
 }
 
 /* Fun Toggle Switch Styling */
-.fun-toggle-container {
+.fun-toggle-container, .sport-toggle-container {
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+.fun-toggle-container {
     margin-top: 16px;
 }
 
@@ -861,7 +864,7 @@ body.fun-mode svg text {
 }
 
 body.fun-mode .race-date {
-    background: var(--accent-light);
+    background: var(--panel);
     color: var(--accent);
     transform: rotate(-2deg);
     display: inline-block;

@@ -39,6 +39,7 @@ let cantonIds = [];
 let series = [];
 let activeCanton = null;
 let selectedCompareCantons = new Set();
+const voteMetaByDate = new Map();
 let state = {
     fromIndex: 0,
     toIndex: 0,
@@ -83,7 +84,6 @@ const svg = d3.select("#chart");
 const rankTimelineSvg = d3.select("#rankTimelineChart");
 const tooltip = d3.select("#tooltip");
 const rankingList = d3.select("#rankingList");
-const cantonFilter = document.querySelector("#cantonFilter");
 const lineChartWrap = document.querySelector("#chart")?.closest(".chart-wrap");
 const lineHoverDateBox = document.createElement("div");
 lineHoverDateBox.className = "line-hover-date-box";
@@ -91,72 +91,7 @@ if (lineChartWrap) {
     lineChartWrap.appendChild(lineHoverDateBox);
 }
 
-function syncCantonFilterSelection() {
-    if (!cantonFilter) return;
-    const checkboxes = cantonFilter.querySelectorAll("input[type='checkbox']");
-    checkboxes.forEach(input => {
-        input.checked = selectedCompareCantons.has(input.value);
-    });
-}
 
-function renderCantonFilter() {
-    if (!cantonFilter) return;
-
-    cantonFilter.innerHTML = "";
-    cantonFilter.style.display = "flex";
-    cantonFilter.style.flexWrap = "wrap";
-    cantonFilter.style.gap = "8px 12px";
-    cantonFilter.style.marginTop = "10px";
-    cantonFilter.style.maxHeight = "132px";
-    cantonFilter.style.overflowY = "auto";
-
-    const sortedSeries = [...series].sort((a, b) => d3.ascending(a.id, b.id));
-    sortedSeries.forEach(s => {
-        const label = document.createElement("label");
-        label.style.display = "inline-flex";
-        label.style.alignItems = "center";
-        label.style.gap = "6px";
-        label.style.cursor = "pointer";
-        label.style.fontSize = "12px";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = s.id;
-        checkbox.checked = selectedCompareCantons.has(s.id);
-
-        checkbox.addEventListener("change", () => {
-            if (checkbox.checked) selectedCompareCantons.add(s.id);
-            else selectedCompareCantons.delete(s.id);
-
-            if (activeCanton && selectedCompareCantons.size > 0 && !selectedCompareCantons.has(activeCanton)) {
-                activeCanton = null;
-                tooltip.classed("visible", false);
-                lineHoverDateBox.classList.remove("visible");
-                g.selectAll("circle.hover-dot").remove();
-            }
-
-            update();
-        });
-
-        const coat = document.createElement("img");
-        coat.src = s.coat || fallbackCoat;
-        coat.alt = "";
-        coat.width = 16;
-        coat.height = 16;
-        coat.style.objectFit = "contain";
-        coat.style.border = "1px solid var(--border)";
-        coat.style.borderRadius = "3px";
-        coat.style.background = "#fff";
-
-        const name = document.createElement("span");
-        name.textContent = s.id;
-
-        label.appendChild(checkbox);
-        label.appendChild(coat);
-        label.appendChild(name);
-        cantonFilter.appendChild(label);
-    });
-}
 
 const fromSlider = document.querySelector("#fromSlider");
 const toSlider = document.querySelector("#toSlider");
@@ -172,6 +107,100 @@ const raceDateLabel = document.querySelector("#raceDateLabel");
 const rankingDescription = document.querySelector("#rankingDescription");
 const topCanton = document.querySelector("#topCanton");
 const topCantonSub = document.querySelector("#topCantonSub");
+const sportModeToggle = document.querySelector("#sportModeToggle");
+
+// Audio for Sport Mode
+const sportAudio = new Audio('TTS/output.wav');
+sportAudio.preload = 'auto';
+
+function normalizeDatasetDate(rawDate) {
+    if (!rawDate) return null;
+    const value = String(rawDate).trim();
+    const match = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (!match) return null;
+    const [, day, month, year] = match;
+    return `${year}-${month}-${day}`;
+}
+
+async function loadVoteMetadataFromCsv() {
+    const csvText = await d3.text("data/DATASET CSV 28-05-2026.csv");
+    const rows = d3.dsvFormat(";").parse(csvText);
+    voteMetaByDate.clear();
+
+    rows.forEach(row => {
+        const dateKey = normalizeDatasetDate(row["datum"]);
+        if (!dateKey || voteMetaByDate.has(dateKey)) return;
+        const acceptedRaw = String(row["annahme"] ?? "").trim();
+        const accepted = acceptedRaw === "1";
+        const title = String(row["titel_off_d"] || row["titel_kurz_d"] || "").trim();
+        voteMetaByDate.set(dateKey, { title, accepted });
+    });
+}
+
+// Helper to handle sport audio
+function syncSportAudio(action) {
+    if (!sportModeToggle || !sportModeToggle.checked) {
+        sportAudio.pause();
+        return;
+    }
+
+    if (action === 'play') {
+        sportAudio.play().catch(e => console.log("Audio play failed:", e));
+    } else if (action === 'pause') {
+        sportAudio.pause();
+    } else if (action === 'stop') {
+        sportAudio.pause();
+        sportAudio.currentTime = 0;
+    }
+}
+
+function applySportModeDesign(isSportMode) {
+    document.body.classList.toggle("fun-mode", Boolean(isSportMode));
+}
+
+function setSportModeRaceStartDate() {
+    if (!votes.length) return;
+    const sportStartDate = parseDate("2002-03-03");
+    if (!sportStartDate) return;
+
+    let sportStartIndex = votes.findIndex(v => v.dateObj?.getTime() === sportStartDate.getTime());
+    if (sportStartIndex < 0) {
+        sportStartIndex = votes.findIndex(v => v.dateObj && v.dateObj >= sportStartDate);
+    }
+    if (sportStartIndex < 0) return;
+
+    state.fromIndex = sportStartIndex;
+    if (state.toIndex < state.fromIndex) {
+        state.toIndex = state.fromIndex;
+    }
+    fromSlider.value = state.fromIndex;
+    toSlider.value = state.toIndex;
+    updateSliderTrack();
+    update();
+}
+
+if (sportModeToggle) {
+    applySportModeDesign(sportModeToggle.checked);
+
+    sportModeToggle.addEventListener("change", () => {
+        applySportModeDesign(sportModeToggle.checked);
+
+        if (!sportModeToggle.checked) {
+            syncSportAudio('stop');
+        } else if (raceInterval && !raceIsPaused) {
+            syncSportAudio('play');
+        }
+
+        if (sportModeToggle.checked) {
+            setSportModeRaceStartDate();
+        }
+        
+        // Beim Umschalten des Sportmodus Race immer neu aufbauen,
+        // damit Filter + Startdatum sofort im RaceDateLabel sichtbar sind.
+        const wasPaused = raceIsPaused;
+        startRace(!wasPaused);
+    });
+}
 
 // Slider Track Active Element
 const sliderContainer = document.querySelector(".range-slider-container");
@@ -368,14 +397,18 @@ function transformNationalMeta(sparqlResult) {
     }));
 }
 
-fetchLiveResults().then(liveData => {
-    init(liveData);
-}).catch(err => {
-    console.error('Failed to fetch live data, falling back to data.json', err);
-    d3.json("data.json").then(rawData => {
-        init(rawData);
+loadVoteMetadataFromCsv()
+    .catch(err => console.warn("Failed to load vote metadata CSV", err))
+    .finally(() => {
+        fetchLiveResults().then(liveData => {
+            init(liveData);
+        }).catch(err => {
+            console.error('Failed to fetch live data, falling back to data.json', err);
+            d3.json("data.json").then(rawData => {
+                init(rawData);
+            });
+        });
     });
-});
 
 function init(rawData) {
     // -------------------------------------------------------------------------
@@ -398,7 +431,17 @@ function init(rawData) {
     }).sort((a, b) => d3.ascending(a.date, b.date));
 
     votes = rawData
-        .map((d, index) => ({ ...d, index, dateObj: parseDate(d.date), dateLabel: formatDate(parseDate(d.date)) }))
+        .map((d, index) => {
+            const meta = voteMetaByDate.get(d.date);
+            return {
+                ...d,
+                index,
+                dateObj: parseDate(d.date),
+                dateLabel: formatDate(parseDate(d.date)),
+                title: meta?.title || d.title || `Abstimmung ${d.date}`,
+                accepted: meta?.accepted
+            };
+        })
         .sort((a, b) => d3.ascending(a.dateObj, b.dateObj));
 
     cantonIds = Array.from(new Set(data.map(d => d.id))).sort(d3.ascending);
@@ -412,7 +455,6 @@ function init(rawData) {
         })
     );
 
-    renderCantonFilter();
 
     // -------------------------------------------------------------------------
     // 3) UI initialisieren (Standard: Ganze Zeitspanne)
@@ -427,6 +469,10 @@ function init(rawData) {
     toSlider.min = 0;
     toSlider.max = votes.length - 1;
     toSlider.value = state.toIndex;
+
+    if (sportModeToggle?.checked) {
+        setSportModeRaceStartDate();
+    }
 
     x.domain(d3.extent(data, d => d.date));
     y.domain(d3.extent(data, d => d.value)).nice();
@@ -853,9 +899,20 @@ let globalTogglePause = null;
 let globalChangeSpeed = null;
 const n = 26; // Alle 26 Kantone anzeigen
 
+// Individuelle Geschwindigkeiten pro Abstimmung (in ms)
+// Falls für einen Index kein Wert vorhanden ist, wird raceSpeed verwendet.
+const customRaceSpeeds = {
+    0: 1000, 1: 2000, 3: 2000, 4: 2000, 5: 2000, 6: 2000,
+    7: 2000, 8: 2000, 9: 2000, 10: 2000, 11: 2000, 12: 2000,
+    13: 2000, 14: 1500, 15: 1500, 16: 1500, 17: 1500, 18: 1500,
+    19: 1500, 20: 1500
+};
+
 if (replayRaceButton) {
     replayRaceButton.addEventListener("click", () => {
+        syncSportAudio('stop');
         startRace();
+        syncSportAudio('play');
     });
 }
 
@@ -872,6 +929,7 @@ if (raceSpeedSelect) {
 }
 
 function stopRace() {
+    syncSportAudio('stop');
     if (raceInterval) {
         raceInterval.stop();
         raceInterval = null;
@@ -902,66 +960,116 @@ async function startRace(startImmediately = true) {
 
     const formatNumber = d3.format(",.1f");
 
-    // Bereite Schlüsselbilder vor (Keyframes) mit gleitendem Durchschnitt
+    // Bereite Schlüsselbilder vor (Keyframes)
     raceKeyframes = [];
-    const windowSize = 10; // Durchschnitt über die letzten 10 Abstimmungen
+    const windowSize = 10; // Durchschnitt über die letzten 10 Abstimmungen (nur normaler Modus)
 
-    for (let i = 0; i < votes.length; i++) {
-        const start = Math.max(0, i - windowSize + 1);
-        const windowVotes = votes.slice(start, i + 1);
-        
-        // Berechne Durchschnitt für jeden Kanton in diesem Fenster
-        const cantonAverages = cantonIds.map(cid => {
-            const values = windowVotes.map(v => v.cantons.find(c => c.id === cid)?.value).filter(v => v !== undefined);
-            const avg = values.length > 0 ? d3.mean(values) : 0;
-            const label = windowVotes[windowVotes.length - 1].cantons.find(c => c.id === cid)?.label || cid;
-            return { id: cid, label: label, value: avg };
-        });
+    let raceVotes = votes;
+    if (sportModeToggle && sportModeToggle.checked) {
+        const startDate = new Date("2002-03-03");
+        const endDate = new Date("2008-02-24");
+        raceVotes = votes.filter(v => v.dateObj >= startDate && v.dateObj <= endDate);
+    }
 
-        const sortedCantons = cantonAverages.sort((a, b) => d3.descending(a.value, b.value));
-        raceKeyframes.push([votes[i].dateObj, sortedCantons]);
+    for (let i = 0; i < raceVotes.length; i++) {
+        const currentVote = raceVotes[i];
+        let frameCantons;
+
+        if (sportModeToggle && sportModeToggle.checked) {
+            frameCantons = cantonIds.map(cid => {
+                const canton = currentVote.cantons.find(c => c.id === cid);
+                return {
+                    id: cid,
+                    label: canton?.label || cid,
+                    value: canton ? Number(canton.value) : 0
+                };
+            });
+        } else {
+            const currentVoteDate = currentVote.dateObj;
+            // Finde Index in den Original-Votes für das Fenster (gleitender Durchschnitt)
+            const originalIndex = votes.findIndex(v => v.dateObj.getTime() === currentVoteDate.getTime());
+
+            const start = Math.max(0, originalIndex - windowSize + 1);
+            const windowVotes = votes.slice(start, originalIndex + 1);
+
+            // Berechne Durchschnitt für jeden Kanton in diesem Fenster
+            frameCantons = cantonIds.map(cid => {
+                const values = windowVotes.map(v => v.cantons.find(c => c.id === cid)?.value).filter(v => v !== undefined);
+                const avg = values.length > 0 ? d3.mean(values) : 0;
+                const label = windowVotes[windowVotes.length - 1].cantons.find(c => c.id === cid)?.label || cid;
+                return { id: cid, label: label, value: avg };
+            });
+        }
+
+        const sortedCantons = frameCantons.sort((a, b) => d3.descending(a.value, b.value));
+        raceKeyframes.push([currentVote.dateObj, sortedCantons]);
     }
 
     function runRaceInterval() {
         if (raceInterval) {
             raceInterval.stop();
         }
-        const transitionDuration = Math.max(70, raceSpeed - 40);
 
-        raceInterval = d3.interval(() => {
+        if (raceK === 0 && !raceIsPaused) {
+            syncSportAudio('stop');
+            syncSportAudio('play');
+        }
+
+        const tick = () => {
             if (raceIsPaused) return;
+
+            // Bestimme Geschwindigkeit für dieses Frame
+            const currentSpeed = customRaceSpeeds[raceK] || raceSpeed;
+            const transitionDuration = Math.max(70, currentSpeed - 40);
+
             renderFrame(raceK, transitionDuration);
             raceK++;
-            if (raceK >= raceKeyframes.length) {
-                raceInterval.stop();
+
+            if (raceK < raceKeyframes.length) {
+                // Plane den nächsten Tick mit der (potenziell neuen) Geschwindigkeit
+                const nextSpeed = customRaceSpeeds[raceK] || raceSpeed;
+                raceInterval = d3.timeout(tick, nextSpeed);
+            } else {
                 raceInterval = null;
+                // Bei normalem Rennende Audio weiterlaufen lassen.
+                // Gestoppt wird nur bei Pause oder Neustart.
                 if (pauseRaceButton) {
                     pauseRaceButton.textContent = "↺ Wiederholen";
                 }
             }
-        }, raceSpeed);
+        };
+
+        // Starte den ersten Tick
+        const initialSpeed = customRaceSpeeds[raceK] || raceSpeed;
+        raceInterval = d3.timeout(tick, initialSpeed);
     }
 
     globalTogglePause = () => {
         if (!raceInterval && raceK >= raceKeyframes.length) {
+            syncSportAudio('stop');
             startRace(true);
+            syncSportAudio('play');
             return;
         }
         if (!raceInterval && raceK === 0 && raceIsPaused) {
             raceIsPaused = false;
             if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
+            syncSportAudio('play');
             runRaceInterval();
             return;
         }
         raceIsPaused = !raceIsPaused;
         if (raceIsPaused) {
             if (pauseRaceButton) pauseRaceButton.textContent = "▶ Fortsetzen";
+            syncSportAudio('pause');
             if (raceInterval) {
                 raceInterval.stop();
                 raceInterval = null;
             }
         } else {
             if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
+            syncSportAudio('play');
+            // runRaceInterval() setzt raceInterval neu und führt den nächsten Tick aus
             runRaceInterval();
         }
     };
@@ -1166,7 +1274,6 @@ function update() {
             return (lastDate >= start && lastDate <= end) ? 1 : 0;
         });
 
-    syncCantonFilterSelection();
     updateSliderTrack();
     renderRanking(ranking);
     updateActiveStyles();
@@ -1342,29 +1449,3 @@ function showTooltip(event, cantonSeries) {
 }
 
 // update wird in init() aufgerufen
-
-// -------------------------------------------------------------------------
-// 8) Theme Toggle: Fun Mode
-// -------------------------------------------------------------------------
-const funModeToggle = document.querySelector("#funModeToggle");
-
-function applyFunMode(isFun) {
-    if (isFun) {
-        document.body.classList.add("fun-mode");
-    } else {
-        document.body.classList.remove("fun-mode");
-    }
-}
-
-// Check saved setting
-const isFunModeSaved = localStorage.getItem("funMode") === "true";
-if (funModeToggle) {
-    funModeToggle.checked = isFunModeSaved;
-    applyFunMode(isFunModeSaved);
-
-    funModeToggle.addEventListener("change", () => {
-        const isChecked = funModeToggle.checked;
-        applyFunMode(isChecked);
-        localStorage.setItem("funMode", isChecked);
-    });
-}
