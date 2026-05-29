@@ -1045,6 +1045,7 @@ function setActiveCanton(id, event = null) {
     if (!id) {
         tooltip.classed("visible", false);
         lineHoverDateBox.classList.remove("visible");
+        g.selectAll("circle.hover-dot").remove();
         return;
     }
 
@@ -1085,9 +1086,39 @@ function showTooltip(event, cantonSeries) {
         lineHoverDateBox.style.left = `${hoverX}px`;
         lineHoverDateBox.style.top = `${my}px`;
         lineHoverDateBox.classList.add("visible");
-    }
 
-        tooltip.classed("visible", false);
+        // Hover-Punkt (Kreis) auf der Linie anzeigen
+        let hoverDot = g.selectAll("circle.hover-dot").data([closestPoint]);
+        hoverDot.join("circle")
+            .attr("class", "hover-dot dot")
+            .attr("cx", d => x(d.date))
+            .attr("cy", d => y(d.value))
+            .attr("r", 6)
+            .attr("fill", color(cantonSeries.id))
+            .attr("stroke", "var(--border)")
+            .attr("stroke-width", 2)
+            .style("display", "block");
+
+        // Detaillierten Tooltip anzeigen
+        const ranking = getRanking();
+        const rank = ranking.findIndex(d => d.id === cantonSeries.id) + 1;
+        const entry = ranking.find(d => d.id === cantonSeries.id);
+        
+        if (entry) {
+            tooltip
+                .classed("visible", true)
+                .style("left", `${mx}px`)
+                .style("top", `${my}px`)
+                .html(`
+                  <div class="tooltip-title">
+                    <img src="${entry.coat}" alt="" />
+                    <span>#${rank} ${entry.label} (${entry.id})</span>
+                  </div>
+                  <div>Wert: <strong>${formatValue(closestPoint.value)}%</strong></div>
+                  <div>Datum: ${formatDate(closestPoint.date)}</div>
+                `);
+        }
+    }
 }
 
 // update wird in init() aufgerufen
