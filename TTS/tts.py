@@ -25,21 +25,32 @@ def main():
         return
 
     sys_prompt_path = os.path.join(base_dir, "tts_script_kantonsrennen_systemprompt.txt")
-    ssml_path_1998_2008_fast = os.path.join(base_dir, "tts_script_kantonsrennen_1998_2008_30s_sportmoderator_fast_ssml.xml")
-    ssml_path_1989_2008 = os.path.join(base_dir, "tts_script_kantonsrennen_1989_2008_ssml.xml")
-    ssml_path_v2 = os.path.join(base_dir, "tts_script_kantonsrennen_ssml_v2.xml")
-    if os.path.exists(ssml_path_1998_2008_fast):
-        ssml_path = ssml_path_1998_2008_fast
-    elif os.path.exists(ssml_path_1989_2008):
-        ssml_path = ssml_path_1989_2008
-    elif os.path.exists(ssml_path_v2):
-        ssml_path = ssml_path_v2
-    else:
-        ssml_path = os.path.join(base_dir, "tts_script_kantonsrennen_ssml.xml")
+    import sys
     
+    # Check if a custom input file was passed via command line
+    custom_path = sys.argv[1] if len(sys.argv) > 1 else None
+    
+    if custom_path and os.path.exists(custom_path):
+        ssml_path = custom_path
+        # Assume it's SSML if it ends with .xml, otherwise text
+        is_ssml = custom_path.lower().endswith(".xml")
+    else:
+        ssml_path_1998_2008_fast = os.path.join(base_dir, "tts_script_kantonsrennen_1998_2008_30s_sportmoderator_fast_ssml.xml")
+        ssml_path_1989_2008 = os.path.join(base_dir, "tts_script_kantonsrennen_1989_2008_ssml.xml")
+        ssml_path_v2 = os.path.join(base_dir, "tts_script_kantonsrennen_ssml_v2.xml")
+        if os.path.exists(ssml_path_1998_2008_fast):
+            ssml_path = ssml_path_1998_2008_fast
+        elif os.path.exists(ssml_path_1989_2008):
+            ssml_path = ssml_path_1989_2008
+        elif os.path.exists(ssml_path_v2):
+            ssml_path = ssml_path_v2
+        else:
+            ssml_path = os.path.join(base_dir, "tts_script_kantonsrennen_ssml.xml")
+        is_ssml = True
+
     chunks = []
     
-    if os.path.exists(sys_prompt_path) and os.path.exists(ssml_path):
+    if is_ssml and os.path.exists(sys_prompt_path) and os.path.exists(ssml_path):
         print(f"Lade System-Prompt aus {os.path.basename(sys_prompt_path)} und SSML aus {os.path.basename(ssml_path)}...")
         with open(sys_prompt_path, "r", encoding="utf-8") as f:
             sys_prompt = f.read().strip()

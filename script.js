@@ -1161,3 +1161,29 @@ function showTooltip(event, cantonSeries) {
 }
 
 // update wird in init() aufgerufen
+
+// -------------------------------------------------------------------------
+// 8) Theme Toggle: Fun Mode
+// -------------------------------------------------------------------------
+const funModeToggle = document.querySelector("#funModeToggle");
+
+function applyFunMode(isFun) {
+    if (isFun) {
+        document.body.classList.add("fun-mode");
+    } else {
+        document.body.classList.remove("fun-mode");
+    }
+}
+
+// Check saved setting
+const isFunModeSaved = localStorage.getItem("funMode") === "true";
+if (funModeToggle) {
+    funModeToggle.checked = isFunModeSaved;
+    applyFunMode(isFunModeSaved);
+
+    funModeToggle.addEventListener("change", () => {
+        const isChecked = funModeToggle.checked;
+        applyFunMode(isChecked);
+        localStorage.setItem("funMode", isChecked);
+    });
+}
