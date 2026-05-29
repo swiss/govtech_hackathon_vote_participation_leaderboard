@@ -84,7 +84,6 @@ const svg = d3.select("#chart");
 const rankTimelineSvg = d3.select("#rankTimelineChart");
 const tooltip = d3.select("#tooltip");
 const rankingList = d3.select("#rankingList");
-const cantonFilter = document.querySelector("#cantonFilter");
 const lineChartWrap = document.querySelector("#chart")?.closest(".chart-wrap");
 const lineHoverDateBox = document.createElement("div");
 lineHoverDateBox.className = "line-hover-date-box";
@@ -92,72 +91,7 @@ if (lineChartWrap) {
     lineChartWrap.appendChild(lineHoverDateBox);
 }
 
-function syncCantonFilterSelection() {
-    if (!cantonFilter) return;
-    const checkboxes = cantonFilter.querySelectorAll("input[type='checkbox']");
-    checkboxes.forEach(input => {
-        input.checked = selectedCompareCantons.has(input.value);
-    });
-}
 
-function renderCantonFilter() {
-    if (!cantonFilter) return;
-
-    cantonFilter.innerHTML = "";
-    cantonFilter.style.display = "flex";
-    cantonFilter.style.flexWrap = "wrap";
-    cantonFilter.style.gap = "8px 12px";
-    cantonFilter.style.marginTop = "10px";
-    cantonFilter.style.maxHeight = "132px";
-    cantonFilter.style.overflowY = "auto";
-
-    const sortedSeries = [...series].sort((a, b) => d3.ascending(a.id, b.id));
-    sortedSeries.forEach(s => {
-        const label = document.createElement("label");
-        label.style.display = "inline-flex";
-        label.style.alignItems = "center";
-        label.style.gap = "6px";
-        label.style.cursor = "pointer";
-        label.style.fontSize = "12px";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = s.id;
-        checkbox.checked = selectedCompareCantons.has(s.id);
-
-        checkbox.addEventListener("change", () => {
-            if (checkbox.checked) selectedCompareCantons.add(s.id);
-            else selectedCompareCantons.delete(s.id);
-
-            if (activeCanton && selectedCompareCantons.size > 0 && !selectedCompareCantons.has(activeCanton)) {
-                activeCanton = null;
-                tooltip.classed("visible", false);
-                lineHoverDateBox.classList.remove("visible");
-                g.selectAll("circle.hover-dot").remove();
-            }
-
-            update();
-        });
-
-        const coat = document.createElement("img");
-        coat.src = s.coat || fallbackCoat;
-        coat.alt = "";
-        coat.width = 16;
-        coat.height = 16;
-        coat.style.objectFit = "contain";
-        coat.style.border = "1px solid var(--border)";
-        coat.style.borderRadius = "3px";
-        coat.style.background = "#fff";
-
-        const name = document.createElement("span");
-        name.textContent = s.id;
-
-        label.appendChild(checkbox);
-        label.appendChild(coat);
-        label.appendChild(name);
-        cantonFilter.appendChild(label);
-    });
-}
 
 const fromSlider = document.querySelector("#fromSlider");
 const toSlider = document.querySelector("#toSlider");
@@ -521,7 +455,6 @@ function init(rawData) {
         })
     );
 
-    renderCantonFilter();
 
     // -------------------------------------------------------------------------
     // 3) UI initialisieren (Standard: Ganze Zeitspanne)
@@ -1341,7 +1274,6 @@ function update() {
             return (lastDate >= start && lastDate <= end) ? 1 : 0;
         });
 
-    syncCantonFilterSelection();
     updateSliderTrack();
     renderRanking(ranking);
     updateActiveStyles();
