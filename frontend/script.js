@@ -38,11 +38,21 @@ let votes = [];
 let cantonIds = [];
 let series = [];
 let activeCanton = null;
+let selectedCompareCantons = new Set();
 let state = {
     fromIndex: 0,
     toIndex: 0,
     rankingMode: "avg"
 };
+
+function toggleCantonSelection(id) {
+    if (selectedCompareCantons.has(id)) {
+        selectedCompareCantons.delete(id);
+    } else {
+        selectedCompareCantons.add(id);
+    }
+    update();
+}
 
 const parseDate = d3.timeParse("%Y-%m-%d");
 const formatDate = d3.timeFormat("%d.%m.%Y");
@@ -661,6 +671,7 @@ if (rankAggregationSelect) {
 }
 
 resetButton.addEventListener("click", () => {
+    selectedCompareCantons.clear();
     state = { fromIndex: 0, toIndex: votes.length - 1, rankingMode: rankingMode.value };
     fromSlider.value = state.fromIndex;
     toSlider.value = state.toIndex;
@@ -1009,6 +1020,16 @@ function renderRanking(ranking) {
                     .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
                     .on("pointerleave", () => setActiveCanton(null));
 
+                const checkboxWrap = item.append("div").attr("class", "rank-checkbox-wrap");
+                checkboxWrap.append("input")
+                    .attr("type", "checkbox")
+                    .attr("class", "compare-checkbox")
+                    .attr("title", "Kanton vergleichen")
+                    .on("click", (event, d) => {
+                        event.stopPropagation();
+                        toggleCantonSelection(d.id);
+                    });
+
                 item.append("div").attr("class", "rank-number");
                 item.append("img").attr("class", "coat").attr("alt", "");
 
@@ -1030,6 +1051,7 @@ function renderRanking(ranking) {
 
     items.select(".rank-number").text((d, i) => `#${i + 1}`);
     items.select("img").attr("src", d => d.coat).attr("alt", d => `${d.label} Wappen`);
+    items.select(".compare-checkbox").property("checked", d => selectedCompareCantons.has(d.id));
     items.select(".canton-name").text(d => d.label);
     items.select(".canton-code").text(d => d.id);
     items.select(".rank-value").text(d => {
@@ -1054,11 +1076,18 @@ function setActiveCanton(id, event = null) {
 }
 
 function updateActiveStyles() {
+    const hasSelection = selectedCompareCantons.size > 0;
+
     seriesGroup.selectAll("path.line")
+        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none")
         .classed("is-muted", d => activeCanton && d.id !== activeCanton)
         .classed("is-active", d => activeCanton && d.id === activeCanton);
 
+    seriesGroup.selectAll("path.hit-line")
+        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none");
+
     labelsGroup.selectAll("text")
+        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none")
         .style("opacity", d => !activeCanton || d.id === activeCanton ? 1 : 0.2)
         .style("font-size", d => activeCanton === d.id ? "15px" : "12px");
 
