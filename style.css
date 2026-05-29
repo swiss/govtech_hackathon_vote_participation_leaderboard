@@ -746,10 +746,13 @@ svg {
 }
 
 /* Fun Toggle Switch Styling */
-.fun-toggle-container {
+.fun-toggle-container, .sport-toggle-container {
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+.fun-toggle-container {
     margin-top: 16px;
 }
 
