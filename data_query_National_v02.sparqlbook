@@ -1,0 +1,32 @@
+[
+  {
+    "kind": 1,
+    "language": "markdown",
+    "value": "# Purpose\r\nGet the dates, titles, accepted or not",
+    "metadata": {}
+  },
+  {
+    "kind": 2,
+    "language": "sparql",
+    "value": "# FINAL VERSION\r\n\r\nPREFIX schema: <http://schema.org/>\r\n\r\nSELECT ?date ?department ?titleText ?accepted\r\nWHERE {\r\n  <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .\r\n  ?observationSet0 <https://cube.link/observation> ?votation .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region .\r\n  #?votation <https://politics.ld.admin.ch/political-rights/popular-vote/stimmbeteiligung> ?participation .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/abstimmungstitel> ?title .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/departementHist> ?dept1 .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/ergebnisBinary> ?accepted .\r\n\r\n  ?title schema:name ?titleText .\r\n  # ?region schema:alternateName ?regionAlternateName .\r\n  ?dept1 schema:name ?department .\r\n\r\n  FILTER(STR(?region) = \"https://ld.admin.ch/country/CHE\")\r\n  FILTER(LANG(?titleText) = \"de\")\r\n  FILTER(LANG(?department) = \"de\")\r\n}\r\n\r\nORDER BY DESC(?date)\r\nLIMIT 20",
+    "metadata": {}
+  },
+  {
+    "kind": 2,
+    "language": "sparql",
+    "value": "# SELECT ?date ?region (AVG(?participation) AS ?participation) WHERE {\r\n#   <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .\r\n#   ?observationSet0 <https://cube.link/observation> ?votation .\r\n#   ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region .\r\n#   ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/stimmbeteiligung> ?participation .\r\n#   ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date .\r\n\r\n#   FILTER(STRSTARTS(STR(?region), \"https://ld.admin.ch/canton/\"))\r\n# }\r\n# GROUP BY ?date ?region\r\n# ORDER BY DESC(?date) ?region\r\n# LIMIT 20",
+    "metadata": {}
+  },
+  {
+    "kind": 1,
+    "language": "markdown",
+    "value": "# from opendata.swiss\r\nhttps://opendata.swiss/de/dataset/echtzeitdaten-am-abstimmungstag-zu-eidgenoessischen-abstimmungsvorlagen\r\n\r\n- abstimmtag\r\n- concatenate of vorlagenTitel -> DE\r\n",
+    "metadata": {}
+  },
+  {
+    "kind": 2,
+    "language": "sparql",
+    "value": "# PREFIX schema: <http://schema.org/>\r\n\r\n# SELECT ?date\r\n#        (GROUP_CONCAT(?numberedTitle; separator=\" _ \") AS ?titles)\r\n# WHERE {\r\n\r\n#   {\r\n#     SELECT ?date ?titleText\r\n#            (COUNT(?smallerTitle) + 1 AS ?rank)\r\n#            (CONCAT(STR(COUNT(?smallerTitle) + 1), \". \", STR(?titleText)) AS ?numberedTitle)\r\n#     WHERE {\r\n\r\n#       <https://politics.ld.admin.ch/political-rights/popular-vote/1>\r\n#         <https://cube.link/observationSet> ?observationSet0 .\r\n\r\n#       ?observationSet0\r\n#         <https://cube.link/observation> ?votation .\r\n\r\n#       ?votation\r\n#         <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region ;\r\n#         <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date ;\r\n#         <https://politics.ld.admin.ch/political-rights/popular-vote/abstimmungstitel> ?title .\r\n\r\n#       ?title schema:name ?titleText .\r\n\r\n#       FILTER(?region = <https://ld.admin.ch/country/CHE>)\r\n#       FILTER(LANG(?titleText) = \"de\")\r\n\r\n#       OPTIONAL {\r\n\r\n#         ?votation2\r\n#           <https://politics.ld.admin.ch/political-rights/popular-vote/region> <https://ld.admin.ch/country/CHE> ;\r\n#           <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date ;\r\n#           <https://politics.ld.admin.ch/political-rights/popular-vote/abstimmungstitel> ?title2 .\r\n\r\n#         ?title2 schema:name ?smallerTitle .\r\n\r\n#         FILTER(LANG(?smallerTitle) = \"de\")\r\n#         FILTER(STR(?smallerTitle) < STR(?titleText))\r\n#       }\r\n\r\n#     }\r\n#     GROUP BY ?date ?titleText\r\n#     ORDER BY ?date ?rank\r\n#   }\r\n\r\n# }\r\n# GROUP BY ?date\r\n# ORDER BY DESC(?date)\r\n# LIMIT 20",
+    "metadata": {}
+  }
+]

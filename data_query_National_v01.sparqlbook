@@ -1,0 +1,20 @@
+[
+  {
+    "kind": 1,
+    "language": "markdown",
+    "value": "# Purpose\r\nObtain the list at the national level of\r\ndate, title, accepted or not, percentage of voters, nr of cantons",
+    "metadata": {}
+  },
+  {
+    "kind": 1,
+    "language": "markdown",
+    "value": "# from opendata.swiss\r\nhttps://opendata.swiss/de/dataset/echtzeitdaten-am-abstimmungstag-zu-eidgenoessischen-abstimmungsvorlagen\r\n\r\n- abstimmtag\r\n- vorlagenTitel -> DE\r\n- vorlageAngenommen --> if taken or not",
+    "metadata": {}
+  },
+  {
+    "kind": 2,
+    "language": "sparql",
+    "value": "# TEST\r\n\r\nPREFIX schema: <http://schema.org/>\r\n\r\nSELECT ?date ?regionAlternateName ?department ?titleText ?accepted \r\nWHERE {\r\n  <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .\r\n  ?observationSet0 <https://cube.link/observation> ?votation .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region .\r\n  #?votation <https://politics.ld.admin.ch/political-rights/popular-vote/stimmbeteiligung> ?participation .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/abstimmungstitel> ?title .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/departementHist> ?dept1 .\r\n  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/ergebnisBinary> ?accepted .\r\n\r\n  ?title schema:name ?titleText .\r\n  ?region schema:alternateName ?regionAlternateName .\r\n  ?dept1 schema:name ?department .\r\n\r\n  FILTER(STR(?region) = \"https://ld.admin.ch/country/CHE\")\r\n  FILTER(LANG(?titleText) = \"de\")\r\n  FILTER(LANG(?department) = \"de\")\r\n}\r\n\r\nORDER BY DESC(?date)\r\n#LIMIT 20",
+    "metadata": {}
+  }
+]
