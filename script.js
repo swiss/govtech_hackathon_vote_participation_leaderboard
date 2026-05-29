@@ -40,6 +40,11 @@ let series = [];
 let activeCanton = null;
 let selectedCompareCantons = new Set();
 const voteMetaByDate = new Map();
+let voteEntriesById = new Map();
+let rankingCacheKey = "";
+let rankingCacheValue = [];
+let tooltipFrameHandle = null;
+let pendingTooltipPayload = null;
 let state = {
     fromIndex: 0,
     toIndex: 0,
@@ -79,6 +84,19 @@ function getAcceptedBadge(accepted) {
     return `<span style="color:#64748b;font-weight:800;">•</span>`;
 }
 
+function scheduleTooltip(event, cantonSeries) {
+    pendingTooltipPayload = { event, cantonSeries };
+    if (tooltipFrameHandle !== null) return;
+
+    tooltipFrameHandle = requestAnimationFrame(() => {
+        tooltipFrameHandle = null;
+        if (!pendingTooltipPayload) return;
+        const { event: queuedEvent, cantonSeries: queuedSeries } = pendingTooltipPayload;
+        pendingTooltipPayload = null;
+        showTooltip(queuedEvent, queuedSeries);
+    });
+}
+
 // DOM + D3 Globals
 const svg = d3.select("#chart");
 const rankTimelineSvg = d3.select("#rankTimelineChart");
@@ -110,8 +128,8 @@ const topCantonSub = document.querySelector("#topCantonSub");
 const sportModeToggle = document.querySelector("#sportModeToggle");
 
 // Audio for Sport Mode
-const sportAudio = new Audio('TTS/output.wav');
-sportAudio.preload = 'auto';
+//const sportAudio = new Audio('TTS/output.wav');
+//sportAudio.preload = 'auto';
 
 function normalizeDatasetDate(rawDate) {
     if (!rawDate) return null;
@@ -138,7 +156,7 @@ async function loadVoteMetadataFromCsv() {
 }
 
 // Helper to handle sport audio
-function syncSportAudio(action) {
+/*function syncSportAudio(action) {
     if (!sportModeToggle || !sportModeToggle.checked) {
         sportAudio.pause();
         return;
@@ -152,7 +170,7 @@ function syncSportAudio(action) {
         sportAudio.pause();
         sportAudio.currentTime = 0;
     }
-}
+}*/
 
 function applySportModeDesign(isSportMode) {
     document.body.classList.toggle("fun-mode", Boolean(isSportMode));
@@ -184,12 +202,12 @@ if (sportModeToggle) {
 
     sportModeToggle.addEventListener("change", () => {
         applySportModeDesign(sportModeToggle.checked);
-
+/*
         if (!sportModeToggle.checked) {
             syncSportAudio('stop');
         } else if (raceInterval && !raceIsPaused) {
             syncSportAudio('play');
-        }
+        }*/
 
         if (sportModeToggle.checked) {
             setSportModeRaceStartDate();
@@ -444,6 +462,10 @@ function init(rawData) {
         })
         .sort((a, b) => d3.ascending(a.dateObj, b.dateObj));
 
+    for (const vote of votes) {
+        vote.cantonById = new Map((vote.cantons || []).map(c => [c.id, c]));
+    }
+
     cantonIds = Array.from(new Set(data.map(d => d.id))).sort(d3.ascending);
     series = Array.from(
         d3.group(data, d => d.id),
@@ -454,6 +476,10 @@ function init(rawData) {
             values: values.sort((a, b) => d3.ascending(a.date, b.date))
         })
     );
+
+    voteEntriesById = d3.group(data, d => d.voteId);
+    rankingCacheKey = "";
+    rankingCacheValue = [];
 
 
     // -------------------------------------------------------------------------
@@ -496,7 +522,7 @@ function init(rawData) {
         .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
         .on("pointermove", (event, d) => {
             setActiveCanton(d.id, event);
-            showTooltip(event, d);
+            scheduleTooltip(event, d);
         })
         .on("pointerleave", () => setActiveCanton(null));
 
@@ -514,7 +540,7 @@ function init(rawData) {
         .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
         .on("pointermove", (event, d) => {
             setActiveCanton(d.id, event);
-            showTooltip(event, d);
+            scheduleTooltip(event, d);
         })
         .on("pointerleave", () => setActiveCanton(null));
 
@@ -902,12 +928,9 @@ const n = 26; // Alle 26 Kantone anzeigen
 // Individuelle Geschwindigkeiten pro Abstimmung (in ms)
 // Falls für einen Index kein Wert vorhanden ist, wird raceSpeed verwendet.
 const customRaceSpeeds = {
-    0: 1000, 1: 2000, 3: 2000, 4: 2000, 5: 2000, 6: 2000,
-    7: 2000, 8: 2000, 9: 2000, 10: 2000, 11: 2000, 12: 2000,
-    13: 2000, 14: 1500, 15: 1500, 16: 1500, 17: 1500, 18: 1500,
-    19: 1500, 20: 1500
-};
 
+};
+/*
 if (replayRaceButton) {
     replayRaceButton.addEventListener("click", () => {
         syncSportAudio('stop');
@@ -915,7 +938,7 @@ if (replayRaceButton) {
         syncSportAudio('play');
     });
 }
-
+*/
 if (pauseRaceButton) {
     pauseRaceButton.addEventListener("click", () => {
         if (globalTogglePause) globalTogglePause();
@@ -929,9 +952,9 @@ if (raceSpeedSelect) {
 }
 
 function stopRace() {
-    syncSportAudio('stop');
+    //syncSportAudio('stop');
     if (raceInterval) {
-        raceInterval.stop();
+        cancelAnimationFrame(raceInterval);
         raceInterval = null;
     }
 }
@@ -971,13 +994,15 @@ async function startRace(startImmediately = true) {
         raceVotes = votes.filter(v => v.dateObj >= startDate && v.dateObj <= endDate);
     }
 
+    const voteIndexByTime = new Map(votes.map((vote, index) => [vote.dateObj.getTime(), index]));
+
     for (let i = 0; i < raceVotes.length; i++) {
         const currentVote = raceVotes[i];
         let frameCantons;
 
         if (sportModeToggle && sportModeToggle.checked) {
             frameCantons = cantonIds.map(cid => {
-                const canton = currentVote.cantons.find(c => c.id === cid);
+                const canton = currentVote.cantonById.get(cid);
                 return {
                     id: cid,
                     label: canton?.label || cid,
@@ -986,17 +1011,21 @@ async function startRace(startImmediately = true) {
             });
         } else {
             const currentVoteDate = currentVote.dateObj;
-            // Finde Index in den Original-Votes für das Fenster (gleitender Durchschnitt)
-            const originalIndex = votes.findIndex(v => v.dateObj.getTime() === currentVoteDate.getTime());
+            const originalIndex = voteIndexByTime.get(currentVoteDate.getTime()) ?? -1;
+            if (originalIndex < 0) continue;
 
             const start = Math.max(0, originalIndex - windowSize + 1);
             const windowVotes = votes.slice(start, originalIndex + 1);
 
             // Berechne Durchschnitt für jeden Kanton in diesem Fenster
             frameCantons = cantonIds.map(cid => {
-                const values = windowVotes.map(v => v.cantons.find(c => c.id === cid)?.value).filter(v => v !== undefined);
+                const values = [];
+                for (const vote of windowVotes) {
+                    const value = vote.cantonById.get(cid)?.value;
+                    if (value !== undefined) values.push(value);
+                }
                 const avg = values.length > 0 ? d3.mean(values) : 0;
-                const label = windowVotes[windowVotes.length - 1].cantons.find(c => c.id === cid)?.label || cid;
+                const label = windowVotes[windowVotes.length - 1].cantonById.get(cid)?.label || cid;
                 return { id: cid, label: label, value: avg };
             });
         }
@@ -1007,68 +1036,71 @@ async function startRace(startImmediately = true) {
 
     function runRaceInterval() {
         if (raceInterval) {
-            raceInterval.stop();
+            cancelAnimationFrame(raceInterval);
+            raceInterval = null;
         }
+        let lastTs = 0;
+        let elapsedMs = 0;
 
-        if (raceK === 0 && !raceIsPaused) {
-            syncSportAudio('stop');
-            syncSportAudio('play');
-        }
-
-        const tick = () => {
-            if (raceIsPaused) return;
-
-            // Bestimme Geschwindigkeit für dieses Frame
-            const currentSpeed = customRaceSpeeds[raceK] || raceSpeed;
-            const transitionDuration = Math.max(70, currentSpeed - 40);
-
-            renderFrame(raceK, transitionDuration);
-            raceK++;
-
-            if (raceK < raceKeyframes.length) {
-                // Plane den nächsten Tick mit der (potenziell neuen) Geschwindigkeit
-                const nextSpeed = customRaceSpeeds[raceK] || raceSpeed;
-                raceInterval = d3.timeout(tick, nextSpeed);
-            } else {
+        const tick = (ts) => {
+            if (raceIsPaused) {
                 raceInterval = null;
-                // Bei normalem Rennende Audio weiterlaufen lassen.
-                // Gestoppt wird nur bei Pause oder Neustart.
+                return;
+            }
+            if (!lastTs) {
+                lastTs = ts;
+            }
+            elapsedMs += ts - lastTs;
+            lastTs = ts;
+
+            while (raceK < raceKeyframes.length) {
+                const currentSpeed = customRaceSpeeds[raceK] || raceSpeed;
+                if (elapsedMs < currentSpeed) break;
+                elapsedMs -= currentSpeed;
+                const transitionDuration = Math.max(70, currentSpeed - 40);
+                renderFrame(raceK, transitionDuration);
+                raceK++;
+            }
+
+            if (raceK >= raceKeyframes.length) {
+                raceInterval = null;
                 if (pauseRaceButton) {
                     pauseRaceButton.textContent = "↺ Wiederholen";
                 }
+                return;
             }
+
+            raceInterval = requestAnimationFrame(tick);
         };
 
-        // Starte den ersten Tick
-        const initialSpeed = customRaceSpeeds[raceK] || raceSpeed;
-        raceInterval = d3.timeout(tick, initialSpeed);
+        raceInterval = requestAnimationFrame(tick);
     }
 
     globalTogglePause = () => {
         if (!raceInterval && raceK >= raceKeyframes.length) {
-            syncSportAudio('stop');
+            //syncSportAudio('stop');
             startRace(true);
-            syncSportAudio('play');
+            //syncSportAudio('play');
             return;
         }
         if (!raceInterval && raceK === 0 && raceIsPaused) {
             raceIsPaused = false;
             if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
-            syncSportAudio('play');
+            //syncSportAudio('play');
             runRaceInterval();
             return;
         }
         raceIsPaused = !raceIsPaused;
         if (raceIsPaused) {
             if (pauseRaceButton) pauseRaceButton.textContent = "▶ Fortsetzen";
-            syncSportAudio('pause');
+            //syncSportAudio('pause');
             if (raceInterval) {
-                raceInterval.stop();
+                cancelAnimationFrame(raceInterval);
                 raceInterval = null;
             }
         } else {
             if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
-            syncSportAudio('play');
+            //syncSportAudio('play');
             // runRaceInterval() setzt raceInterval neu und führt den nächsten Tick aus
             runRaceInterval();
         }
@@ -1076,10 +1108,22 @@ async function startRace(startImmediately = true) {
 
     globalChangeSpeed = (newSpeed) => {
         raceSpeed = newSpeed;
-        if (raceInterval && !raceIsPaused) {
-            runRaceInterval();
-        }
     };
+
+    // Statische Rangnummern nur einmal zeichnen (nicht pro Frame).
+    raceSvg.selectAll("text.race-rank-static")
+        .data(d3.range(n))
+        .join("text")
+        .attr("class", "race-rank-static")
+        .attr("text-anchor", "start")
+        .attr("x", 20)
+        .attr("y", i => yRace(i) + yRace.bandwidth() / 2)
+        .attr("dy", "0.35em")
+        .style("font-family", "inherit")
+        .style("font-weight", i => i < 3 ? "900" : "700")
+        .style("font-size", i => i === 0 ? "16px" : i < 3 ? "14px" : "13px")
+        .style("fill", i => i === 0 ? "#b58900" : i === 1 ? "#64748b" : i === 2 ? "#a16207" : "var(--muted)")
+        .text(i => `#${i + 1}`);
 
     // Initiales Zeichnen
     function renderFrame(index, transitionDuration) {
@@ -1095,21 +1139,6 @@ async function startRace(startImmediately = true) {
             topCantonSub.textContent = `${currentTop.label}: ${formatValue(currentTop.value)}%`;
         }
 
-        // Draw static rank numbers on the far left
-        raceSvg.selectAll("text.race-rank-static")
-            .data(d3.range(n))
-            .join("text")
-            .attr("class", "race-rank-static")
-            .attr("text-anchor", "start")
-            .attr("x", 20)
-            .attr("y", i => yRace(i) + yRace.bandwidth() / 2)
-            .attr("dy", "0.35em")
-            .style("font-family", "inherit")
-            .style("font-weight", i => i < 3 ? "900" : "700")
-            .style("font-size", i => i === 0 ? "16px" : i < 3 ? "14px" : "13px")
-            .style("fill", i => i === 0 ? "#b58900" : i === 1 ? "#64748b" : i === 2 ? "#a16207" : "var(--muted)")
-            .text(i => `#${i + 1}`);
-
         raceSvg.selectAll("rect.bar")
             .data(displayedData, d => d.id)
             .join(
@@ -1123,6 +1152,7 @@ async function startRace(startImmediately = true) {
                 update => update,
                 exit => exit.transition().duration(transitionDuration).attr("width", 0).attr("y", yRace(n)).remove()
             )
+            .interrupt()
             .transition().duration(transitionDuration).ease(d3.easeLinear)
             .attr("y", (d, i) => yRace(i))
             .attr("width", d => xRace(d.value) - xRace(0))
@@ -1144,6 +1174,7 @@ async function startRace(startImmediately = true) {
                 update => update,
                 exit => exit.transition().duration(transitionDuration).attr("y", yRace(n)).remove()
             )
+            .interrupt()
             .transition().duration(transitionDuration).ease(d3.easeLinear)
             .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
             .text(d => d.label)
@@ -1164,13 +1195,11 @@ async function startRace(startImmediately = true) {
                 update => update,
                 exit => exit.transition().duration(transitionDuration).attr("y", yRace(n)).remove()
             )
+            .interrupt()
             .transition().duration(transitionDuration).ease(d3.easeLinear)
             .attr("x", d => xRace(d.value) + 6)
             .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
-            .textTween(function(d) {
-                const i = d3.interpolateNumber(parseFloat(this.textContent) || 0, d.value);
-                return t => formatNumber(i(t)) + "%";
-            })
+            .text(d => formatNumber(d.value) + "%")
             .selection()
             .classed("podium-1", (d, i) => i === 0)
             .classed("podium-2", (d, i) => i === 1)
@@ -1200,8 +1229,18 @@ function getSelectedDateRange() {
 }
 
 function getRanking() {
-    const { voteIds } = getSelectedDateRange();
-    const selectedData = data.filter(d => voteIds.has(d.voteId));
+    const cacheKey = `${state.fromIndex}|${state.toIndex}|${state.rankingMode}`;
+    if (cacheKey === rankingCacheKey) {
+        return rankingCacheValue;
+    }
+
+    const selectedVotes = getSelectedVotes();
+    const selectedData = [];
+    for (const vote of selectedVotes) {
+        const entries = voteEntriesById.get(vote.id);
+        if (entries && entries.length) selectedData.push(...entries);
+    }
+
     const grouped = Array.from(d3.group(selectedData, d => d.id), ([id, values]) => {
         values = values.sort((a, b) => d3.ascending(a.date, b.date));
         const first = values[0];
@@ -1228,7 +1267,9 @@ function getRanking() {
         };
     });
 
-    return grouped.sort((a, b) => d3.descending(a.score, b.score));
+    rankingCacheValue = grouped.sort((a, b) => d3.descending(a.score, b.score));
+    rankingCacheKey = cacheKey;
+    return rankingCacheValue;
 }
 
 function getModeText() {
@@ -1314,10 +1355,7 @@ function renderRanking(ranking) {
             exit => exit.remove()
         );
 
-    items
-        .transition()
-        .duration(280)
-        .style("opacity", 1);
+    items.style("opacity", 1);
 
     items.select(".rank-number").text((d, i) => `#${i + 1}`);
     items.select("img").attr("src", d => d.coat).attr("alt", d => `${d.label} Wappen`);
@@ -1335,6 +1373,11 @@ function setActiveCanton(id, event = null) {
     updateActiveStyles();
 
     if (!id) {
+        pendingTooltipPayload = null;
+        if (tooltipFrameHandle !== null) {
+            cancelAnimationFrame(tooltipFrameHandle);
+            tooltipFrameHandle = null;
+        }
         tooltip.classed("visible", false);
         lineHoverDateBox.classList.remove("visible");
         g.selectAll("circle.hover-dot").remove();
