@@ -38,6 +38,7 @@ let votes = [];
 let cantonIds = [];
 let series = [];
 let activeCanton = null;
+let selectedCantons = new Set();
 let state = {
     fromIndex: 0,
     toIndex: 0,
@@ -48,16 +49,113 @@ const parseDate = d3.timeParse("%Y-%m-%d");
 const formatDate = d3.timeFormat("%d.%m.%Y");
 const formatValue = d3.format(".1f");
 
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function getAcceptedBadge(accepted) {
+    const normalized = String(accepted ?? "").trim().toLowerCase();
+    if (normalized === "1" || normalized === "true") {
+        return `<span style="color:#16a34a;font-weight:800;">✓</span>`;
+    }
+    if (normalized === "0" || normalized === "false") {
+        return `<span style="color:#dc2626;font-weight:800;">✗</span>`;
+    }
+    return `<span style="color:#64748b;font-weight:800;">•</span>`;
+}
+
 // DOM + D3 Globals
 const svg = d3.select("#chart");
 const rankTimelineSvg = d3.select("#rankTimelineChart");
 const tooltip = d3.select("#tooltip");
 const rankingList = d3.select("#rankingList");
+const cantonFilter = document.querySelector("#cantonFilter");
 const lineChartWrap = document.querySelector("#chart")?.closest(".chart-wrap");
 const lineHoverDateBox = document.createElement("div");
 lineHoverDateBox.className = "line-hover-date-box";
 if (lineChartWrap) {
     lineChartWrap.appendChild(lineHoverDateBox);
+}
+
+function isCantonVisible(id) {
+    return selectedCantons.size === 0 || selectedCantons.has(id);
+}
+
+function applyCantonVisibility() {
+    seriesGroup.selectAll("path.line")
+        .style("display", d => isCantonVisible(d.id) ? null : "none");
+
+    seriesGroup.selectAll("path.hit-line")
+        .style("display", d => isCantonVisible(d.id) ? null : "none");
+
+    labelsGroup.selectAll("text")
+        .style("display", d => isCantonVisible(d.id) ? null : "none");
+}
+
+function renderCantonFilter() {
+    if (!cantonFilter) return;
+
+    cantonFilter.innerHTML = "";
+    cantonFilter.style.display = "flex";
+    cantonFilter.style.flexWrap = "wrap";
+    cantonFilter.style.gap = "8px 12px";
+    cantonFilter.style.marginTop = "10px";
+    cantonFilter.style.maxHeight = "132px";
+    cantonFilter.style.overflowY = "auto";
+
+    const sortedSeries = [...series].sort((a, b) => d3.ascending(a.id, b.id));
+    sortedSeries.forEach(s => {
+        const label = document.createElement("label");
+        label.style.display = "inline-flex";
+        label.style.alignItems = "center";
+        label.style.gap = "6px";
+        label.style.cursor = "pointer";
+        label.style.fontSize = "12px";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = s.id;
+        checkbox.checked = selectedCantons.has(s.id);
+
+        checkbox.addEventListener("change", () => {
+            if (checkbox.checked) {
+                selectedCantons.add(s.id);
+            } else {
+                selectedCantons.delete(s.id);
+            }
+
+            if (activeCanton && !isCantonVisible(activeCanton)) {
+                activeCanton = null;
+                tooltip.classed("visible", false);
+                lineHoverDateBox.classList.remove("visible");
+            }
+
+            update();
+        });
+
+        const coat = document.createElement("img");
+        coat.src = s.coat || fallbackCoat;
+        coat.alt = "";
+        coat.width = 16;
+        coat.height = 16;
+        coat.style.objectFit = "contain";
+        coat.style.border = "1px solid var(--border)";
+        coat.style.borderRadius = "3px";
+        coat.style.background = "#fff";
+
+        const name = document.createElement("span");
+        name.textContent = s.id;
+
+        label.appendChild(checkbox);
+        label.appendChild(coat);
+        label.appendChild(name);
+        cantonFilter.appendChild(label);
+    });
 }
 
 const fromSlider = document.querySelector("#fromSlider");
@@ -138,6 +236,37 @@ const sparqlQuery = `SELECT ?date ?region (AVG(?participation) AS ?participation
 GROUP BY ?date ?region
 ORDER BY DESC(?date) ?region`;
 
+// date, title and accepted rejects
+const sparqlQueryNational = `
+    # FINAL VERSION
+
+PREFIX schema: <http://schema.org/>
+
+SELECT ?date ?department ?titleText ?accepted
+WHERE {
+  <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .
+  ?observationSet0 <https://cube.link/observation> ?votation .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region .
+  #?votation <https://politics.ld.admin.ch/political-rights/popular-vote/stimmbeteiligung> ?participation .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/date> ?date .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/abstimmungstitel> ?title .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/departementHist> ?dept1 .
+  ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/ergebnisBinary> ?accepted .
+
+  ?title schema:name ?titleText .
+  # ?region schema:alternateName ?regionAlternateName .
+  ?dept1 schema:name ?department .
+
+  FILTER(STR(?region) = "https://ld.admin.ch/country/CHE")
+  FILTER(LANG(?titleText) = "de")
+  FILTER(LANG(?department) = "de")
+}
+
+ORDER BY DESC(?date)
+# LIMIT 20
+`;
+
+
 const cantonMap = {
     'https://ld.admin.ch/canton/1': { id: 'ZH', label: 'Zürich' },
     'https://ld.admin.ch/canton/2': { id: 'BE', label: 'Bern' },
@@ -167,7 +296,138 @@ const cantonMap = {
     'https://ld.admin.ch/canton/26': { id: 'JU', label: 'Jura' }
 };
 
+// async function fetchLiveResults() {
+//     const endpoint = 'https://ld.admin.ch/query';
+//     const response = await fetch(endpoint, {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/sparql-query',
+//             'Accept': 'application/sparql-results+json'
+//         },
+//         body: sparqlQuery
+//     });
+//     if (!response.ok) throw new Error('Network response was not ok');
+//     const result = await response.json();
+//     return transformSparqlData(result);
+// }
+
 async function fetchLiveResults() {
+    const [cantonResult, nationalResult] = await Promise.all([
+        fetchSparql(sparqlQuery),
+        fetchSparql(sparqlQueryNational)
+    ]);
+    const nationalReferenda = transformNationalMeta(nationalResult);
+    return transformSparqlData(cantonResult, nationalReferenda);
+}
+
+
+// function transformSparqlData(sparqlResult) {
+//     const bindings = sparqlResult.results.bindings;
+//     const groupedByDate = {};
+//     bindings.forEach(b => {
+//         if (!b.date || !b.region || !b.participation) return;
+//         const date = b.date.value;
+//         const regionUri = b.region.value;
+//         const participation = parseFloat(b.participation.value);
+//         if (!groupedByDate[date]) {
+//             groupedByDate[date] = { id: `${date}-vote`, date: date, title: `Popular Vote on ${date}`, cantons: [] };
+//         }
+//         const cantonInfo = cantonMap[regionUri] || { id: regionUri.split('/').pop(), label: regionUri.split('/').pop() };
+//         groupedByDate[date].cantons.push({ id: cantonInfo.id, label: cantonInfo.label, value: participation });
+//     });
+//     return Object.values(groupedByDate).sort((a, b) => a.date.localeCompare(b.date));
+// }
+
+
+function transformSparqlData(sparqlResult, nationalReferenda = []) {
+    const bindings = sparqlResult.results.bindings || [];
+    const referendaByDate = d3.group(nationalReferenda, d => d.date);
+    const groupedByVote = new Map();
+
+    bindings.forEach(b => {
+        if (!b.date || !b.region || !b.participation) return;
+
+        const date = b.date.value;
+        const regionUri = b.region.value;
+        const participation = parseFloat(b.participation.value);
+
+        const cantonInfo = cantonMap[regionUri] || {
+            id: regionUri.split('/').pop(),
+            label: regionUri.split('/').pop()
+        };
+
+        const referendaOnDate = referendaByDate.get(date) || [{
+            title: `Popular Vote on ${date}`,
+            accepted: ''
+        }];
+
+        referendaOnDate.forEach(ref => {
+            const voteKey = `${date}||${ref.title || ''}`;
+
+            if (!groupedByVote.has(voteKey)) {
+                groupedByVote.set(voteKey, {
+                    id: voteKey,
+                    date,
+                    title: ref.title || `Popular Vote on ${date}`,
+                    accepted: ref.accepted || '',
+                    cantons: []
+                });
+            }
+
+            groupedByVote.get(voteKey).cantons.push({
+                id: cantonInfo.id,
+                label: cantonInfo.label,
+                value: participation
+            });
+        });
+    });
+
+    return Array.from(groupedByVote.values())
+        .sort((a, b) =>
+            a.date.localeCompare(b.date) || a.title.localeCompare(b.title)
+        );
+}
+
+
+
+
+// function transformSparqlData(sparqlResult, nationalReferenda = []) {
+//     const bindings = sparqlResult.results.bindings;
+//     // Build a list of all canton-level rows, each with date and region
+//     const rows = [];
+//     bindings.forEach(b => {
+//         if (!b.date || !b.region || !b.participation) return;
+//         const date = b.date.value;
+//         const participation = parseFloat(b.participation.value);
+//         // For each referendum on this date, create a row
+//         const referendaOnDate = nationalReferenda.filter(r => r.date === date);
+//         if (referendaOnDate.length === 0) {
+//             // fallback: one row with generic title
+//             rows.push({
+//                 date,
+//                 title: `Popular Vote on ${date}`,
+//                 accepted: '',
+//                 region: b.region.value,
+//                 value: participation
+//             });
+//         } else {
+//             referendaOnDate.forEach(ref => {
+//                 rows.push({
+//                     date,
+//                     title: ref.title,
+//                     accepted: ref.accepted,
+//                     region: b.region.value,
+//                     value: participation
+//                 });
+//             });
+//         }
+//     });
+//     // You can now group/aggregate rows as needed for your UI
+//     return rows;
+// }
+
+// Helper to fetch any SPARQL query
+async function fetchSparql(queryText) {
     const endpoint = 'https://ld.admin.ch/query';
     const response = await fetch(endpoint, {
         method: 'POST',
@@ -175,28 +435,22 @@ async function fetchLiveResults() {
             'Content-Type': 'application/sparql-query',
             'Accept': 'application/sparql-results+json'
         },
-        body: sparqlQuery
+        body: queryText
     });
     if (!response.ok) throw new Error('Network response was not ok');
-    const result = await response.json();
-    return transformSparqlData(result);
+    return response.json();
 }
 
-function transformSparqlData(sparqlResult) {
-    const bindings = sparqlResult.results.bindings;
-    const groupedByDate = {};
-    bindings.forEach(b => {
-        if (!b.date || !b.region || !b.participation) return;
-        const date = b.date.value;
-        const regionUri = b.region.value;
-        const participation = parseFloat(b.participation.value);
-        if (!groupedByDate[date]) {
-            groupedByDate[date] = { id: `${date}-vote`, date: date, title: `Popular Vote on ${date}`, cantons: [] };
-        }
-        const cantonInfo = cantonMap[regionUri] || { id: regionUri.split('/').pop(), label: regionUri.split('/').pop() };
-        groupedByDate[date].cantons.push({ id: cantonInfo.id, label: cantonInfo.label, value: participation });
-    });
-    return Object.values(groupedByDate).sort((a, b) => a.date.localeCompare(b.date));
+
+// Transform the national-level results into an array of referenda
+function transformNationalMeta(sparqlResult) {
+    const bindings = sparqlResult.results.bindings || [];
+    // Each row: { date, titleText, accepted }
+    return bindings.map(b => ({
+        date: b.date?.value,
+        title: b.titleText?.value,
+        accepted: b.accepted?.value
+    }));
 }
 
 fetchLiveResults().then(liveData => {
@@ -220,6 +474,7 @@ function init(rawData) {
             date,
             dateLabel: formatDate(date),
             title: vote.title,
+            accepted: vote.accepted,
             id: canton.id,
             label: canton.label,
             value: Number(canton.value),
@@ -241,6 +496,8 @@ function init(rawData) {
             values: values.sort((a, b) => d3.ascending(a.date, b.date))
         })
     );
+
+    renderCantonFilter();
 
     // -------------------------------------------------------------------------
     // 3) UI initialisieren (Standard: Ganze Zeitspanne)
@@ -313,6 +570,8 @@ function init(rawData) {
         .transition().duration(400)
         .attr("x", d => x(d.values.at(-1).date) + 8)
         .attr("y", d => y(d.values.at(-1).value));
+
+    applyCantonVisibility();
 
     renderRankTimeline();
     update();
@@ -990,9 +1249,10 @@ function update() {
         .attr("y", d => y(d.values.at(-1).value))
         .style("opacity", d => {
             const lastDate = d.values.at(-1).date;
-            return (lastDate >= start && lastDate <= end) ? 1 : 0;
+            return isCantonVisible(d.id) && (lastDate >= start && lastDate <= end) ? 1 : 0;
         });
 
+    applyCantonVisibility();
     updateSliderTrack();
     renderRanking(ranking);
     updateActiveStyles();
@@ -1039,6 +1299,10 @@ function renderRanking(ranking) {
 }
 
 function setActiveCanton(id, event = null) {
+    if (id && !isCantonVisible(id)) {
+        return;
+    }
+
     activeCanton = id;
     updateActiveStyles();
 
@@ -1053,17 +1317,47 @@ function setActiveCanton(id, event = null) {
 }
 
 function updateActiveStyles() {
+    applyCantonVisibility();
+
     seriesGroup.selectAll("path.line")
-        .classed("is-muted", d => activeCanton && d.id !== activeCanton)
-        .classed("is-active", d => activeCanton && d.id === activeCanton);
+        .classed("is-muted", d => isCantonVisible(d.id) && activeCanton && d.id !== activeCanton)
+        .classed("is-active", d => isCantonVisible(d.id) && activeCanton && d.id === activeCanton);
 
     labelsGroup.selectAll("text")
-        .style("opacity", d => !activeCanton || d.id === activeCanton ? 1 : 0.2)
+        .style("opacity", d => {
+            if (!isCantonVisible(d.id)) return 0;
+            return !activeCanton || d.id === activeCanton ? 1 : 0.2;
+        })
         .style("font-size", d => activeCanton === d.id ? "15px" : "12px");
 
     rankingList.selectAll(".rank-item")
         .classed("is-active", d => activeCanton && d.id === activeCanton);
 }
+
+// function showTooltip(event, cantonSeries) {
+//     const [mx, my] = d3.pointer(event, lineChartWrap);
+//     const mouseXDate = x.invert(d3.pointer(event, g.node())[0]);
+
+//     // Finde den Datenpunkt, der dem Mauszeiger am nächsten liegt
+//     const bisectDate = d3.bisector(d => d.date).left;
+//     const idx = bisectDate(cantonSeries.values, mouseXDate, 1);
+//     const d0 = cantonSeries.values[idx - 1];
+//     const d1 = cantonSeries.values[idx];
+//     let closestPoint = d0;
+//     if (d1 && (mouseXDate - d0.date > d1.date - mouseXDate)) {
+//         closestPoint = d1;
+//     }
+
+//     if (closestPoint && lineChartWrap) {
+//         const hoverX = x(closestPoint.date) + margin.left;
+//         lineHoverDateBox.textContent = `Votation: ${formatDate(closestPoint.date)}`;
+//         lineHoverDateBox.style.left = `${hoverX}px`;
+//         lineHoverDateBox.style.top = `${my}px`;
+//         lineHoverDateBox.classList.add("visible");
+//     }
+
+//         tooltip.classed("visible", false);
+// }
 
 function showTooltip(event, cantonSeries) {
     const [mx, my] = d3.pointer(event, lineChartWrap);
@@ -1081,13 +1375,62 @@ function showTooltip(event, cantonSeries) {
 
     if (closestPoint && lineChartWrap) {
         const hoverX = x(closestPoint.date) + margin.left;
-        lineHoverDateBox.textContent = `Votation: ${formatDate(closestPoint.date)}`;
+        const sameDateItems = cantonSeries.values
+            .filter(point => +point.date === +closestPoint.date)
+            .map(point => ({
+                title: point.title || ("Votation: " + formatDate(point.date)),
+                accepted: point.accepted
+            }));
+
+        const uniqueItems = [];
+        const seen = new Set();
+        for (const item of sameDateItems) {
+            const key = `${item.title}||${String(item.accepted ?? "")}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            uniqueItems.push(item);
+        }
+
+        lineHoverDateBox.innerHTML = uniqueItems
+            .map((item, index) => `${index + 1}. ${getAcceptedBadge(item.accepted)} ${escapeHtml(item.title)}`)
+            .join("<br>");
         lineHoverDateBox.style.left = `${hoverX}px`;
         lineHoverDateBox.style.top = `${my}px`;
         lineHoverDateBox.classList.add("visible");
-    }
 
-        tooltip.classed("visible", false);
+        // Hover-Punkt (Kreis) auf der Linie anzeigen
+        let hoverDot = g.selectAll("circle.hover-dot").data([closestPoint]);
+        hoverDot.join("circle")
+            .attr("class", "hover-dot dot")
+            .attr("cx", d => x(d.date))
+            .attr("cy", d => y(d.value))
+            .attr("r", 6)
+            .attr("fill", color(cantonSeries.id))
+            .attr("stroke", "var(--border)")
+            .attr("stroke-width", 2)
+            .style("display", "block");
+
+        // Detaillierten Tooltip anzeigen
+        const ranking = getRanking();
+        const rank = ranking.findIndex(d => d.id === cantonSeries.id) + 1;
+        const entry = ranking.find(d => d.id === cantonSeries.id);
+
+        if (entry) {
+            tooltip
+                .classed("visible", true)
+                .style("left", `${mx}px`)
+                .style("top", `${my}px`)
+                .html(`
+                  <div class="tooltip-title">
+                    <img src="${entry.coat}" alt="" />
+                    <span>#${rank} ${entry.label} (${entry.id})</span>
+                  </div>
+                  <div>Wert: <strong>${formatValue(closestPoint.value)}%</strong></div>
+                  <div>Datum: ${formatDate(closestPoint.date)}</div>
+                `);
+        }
+    }
 }
+
 
 // update wird in init() aufgerufen
