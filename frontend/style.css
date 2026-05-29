@@ -12,6 +12,9 @@
     --accent-2: #2563eb; /* Vibrant Blue */
     --danger: #ef4444;
     --line-muted: rgba(15, 23, 42, 0.1);
+    --chart-line-width: 1.5;
+    --chart-line-width-active: 2;
+    --rank-line-width: 3px;
     --border: #0f172a;
     --border-width: 2.5px;
     --shadow: 5px 5px 0px #0f172a;
@@ -378,7 +381,7 @@ svg {
 
 .line {
     fill: none;
-    stroke-width: 3.5;
+    stroke-width: var(--chart-line-width);
     stroke-linecap: round;
     stroke-linejoin: round;
     transition: opacity 160ms ease, stroke-width 160ms ease;
@@ -390,7 +393,7 @@ svg {
 
 .line.is-active {
     opacity: 1;
-    stroke-width: 6;
+    stroke-width: var(--chart-line-width-active);
 }
 
 .dot {
@@ -608,7 +611,7 @@ svg {
 
 #rankTimelineChart .rank-progress-line {
     fill: none;
-    stroke-width: 4px;
+    stroke-width: var(--rank-line-width);
     stroke-linecap: round;
     stroke-linejoin: round;
     opacity: 0;

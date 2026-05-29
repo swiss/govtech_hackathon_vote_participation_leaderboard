@@ -1057,9 +1057,19 @@ function updateActiveStyles() {
         .classed("is-muted", d => activeCanton && d.id !== activeCanton)
         .classed("is-active", d => activeCanton && d.id === activeCanton);
 
+    seriesGroup.selectAll("path.hit-line")
+        .filter(d => d.id === activeCanton)
+        .raise();
+
+    seriesGroup.selectAll("path.line")
+        .filter(d => d.id === activeCanton)
+        .raise();
+
     labelsGroup.selectAll("text")
         .style("opacity", d => !activeCanton || d.id === activeCanton ? 1 : 0.2)
-        .style("font-size", d => activeCanton === d.id ? "15px" : "12px");
+        .style("font-size", d => activeCanton === d.id ? "15px" : "12px")
+        .filter(d => d.id === activeCanton)
+        .raise();
 
     rankingList.selectAll(".rank-item")
         .classed("is-active", d => activeCanton && d.id === activeCanton);
