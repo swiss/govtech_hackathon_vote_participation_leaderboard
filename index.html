@@ -18,14 +18,6 @@
                 Multi-Line-Chart mit dynamischem Zeitraumfilter. Jede Linie steht für einen Kanton;
                 rechts wird das Ranking für den gewählten Von/Bis-Zeitraum berechnet.
             </p>
-            <div class="fun-toggle-container">
-                <span class="toggle-label-text">Standard Mode</span>
-                <label class="fun-switch" aria-label="Fun Mode Toggle">
-                    <input type="checkbox" id="funModeToggle">
-                    <span class="fun-slider"></span>
-                </label>
-                <span class="toggle-label-text">Fun Mode</span>
-            </div>
         </div>
 
         <aside class="metric-card" aria-live="polite">
@@ -43,6 +35,14 @@
                     <p>Entwicklung der Stimmbeteiligung (gleitender Durchschnitt über 10 Abstimmungen).</p>
                 </div>
                 <div class="race-controls">
+                    <div class="sport-toggle-container">
+                        <span class="toggle-label-text">Normal</span>
+                        <label class="fun-switch" aria-label="Sport Mode Toggle">
+                            <input type="checkbox" id="sportModeToggle">
+                            <span class="fun-slider"></span>
+                        </label>
+                        <span class="toggle-label-text">Sport 🏁</span>
+                    </div>
                     <span id="raceDateLabel" class="race-date"></span>
                     <button id="replayRaceButton" type="button" class="btn-primary">↺ Neustart</button>
                     <button id="pauseRaceButton" type="button">⏸ Pause</button>
