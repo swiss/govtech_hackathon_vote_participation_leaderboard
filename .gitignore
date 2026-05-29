@@ -1,0 +1,12 @@
+# Environment variables (secrets)
+.env
+TTS/.env
+
+# OS files
+.DS_Store
+
+# Generated audio outputs
+TTS/output.*
+*.wav
+*.pcm
+*.mp3
