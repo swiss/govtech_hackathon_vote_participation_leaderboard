@@ -1,13 +1,1 @@
-<speak>
-  <s><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">Und los! Sprint in die Nullerjahre – das Kantonsrennen nimmt sofort Fahrt auf!</emphasis></prosody></s>
-  <break time="0.15s"/>
-  <s><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">UNO-Beitritt! Historischer Marker, Schaffhausen bleibt vorne im Bild!</emphasis></prosody></s>
-  <break time="0.15s"/>
-  <s><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">Atom und Energie! Tempo im Feld, die Kantone ziehen sichtbar auseinander!</emphasis></prosody></s>
-  <break time="0.15s"/>
-  <s><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">Finanzausgleich! Föderaler Zündstoff – jetzt kommt Bewegung in die Tabelle!</emphasis></prosody></s>
-  <break time="0.15s"/>
-  <s><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">Kampfjetlärm, Unternehmenssteuer! Zwei Themen, ein kurzer Vollgas-Sprint!</emphasis></prosody></s>
-  <break time="0.15s"/>
-  <s><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">Und zum Schluss: Schaffhausen oft vorne, dahinter ein Mittelfeld im Dauerduell!</emphasis></prosody></s>
-</speak>
+<speak><prosody rate="x-fast" pitch="+8%" volume="loud"><emphasis level="strong">Und los! Sprint in die Nullerjahre – das Kantonsrennen nimmt sofort Fahrt auf! UNO-Beitritt! Historischer Marker, Schaffhausen bleibt vorne im Bild! Atom und Energie! Tempo im Feld, die Kantone ziehen sichtbar auseinander! Finanzausgleich! Föderaler Zündstoff – jetzt kommt Bewegung in die Tabelle! Kampfjetlärm, Unternehmenssteuer! Zwei Themen, ein kurzer Vollgas-Sprint! Und zum Schluss: Schaffhausen oft vorne, dahinter ein Mittelfeld im Dauerduell!</emphasis></prosody></speak>
