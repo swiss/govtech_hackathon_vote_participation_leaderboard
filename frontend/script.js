@@ -38,11 +38,21 @@ let votes = [];
 let cantonIds = [];
 let series = [];
 let activeCanton = null;
+let selectedCompareCantons = new Set();
 let state = {
     fromIndex: 0,
     toIndex: 0,
     rankingMode: "avg"
 };
+
+function toggleCantonSelection(id) {
+    if (selectedCompareCantons.has(id)) {
+        selectedCompareCantons.delete(id);
+    } else {
+        selectedCompareCantons.add(id);
+    }
+    update();
+}
 
 const parseDate = d3.timeParse("%Y-%m-%d");
 const formatDate = d3.timeFormat("%d.%m.%Y");
@@ -661,6 +671,7 @@ if (rankAggregationSelect) {
 }
 
 resetButton.addEventListener("click", () => {
+    selectedCompareCantons.clear();
     state = { fromIndex: 0, toIndex: votes.length - 1, rankingMode: rankingMode.value };
     fromSlider.value = state.fromIndex;
     toSlider.value = state.toIndex;
@@ -1009,6 +1020,16 @@ function renderRanking(ranking) {
                     .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
                     .on("pointerleave", () => setActiveCanton(null));
 
+                const checkboxWrap = item.append("div").attr("class", "rank-checkbox-wrap");
+                checkboxWrap.append("input")
+                    .attr("type", "checkbox")
+                    .attr("class", "compare-checkbox")
+                    .attr("title", "Kanton vergleichen")
+                    .on("click", (event, d) => {
+                        event.stopPropagation();
+                        toggleCantonSelection(d.id);
+                    });
+
                 item.append("div").attr("class", "rank-number");
                 item.append("img").attr("class", "coat").attr("alt", "");
 
@@ -1030,6 +1051,7 @@ function renderRanking(ranking) {
 
     items.select(".rank-number").text((d, i) => `#${i + 1}`);
     items.select("img").attr("src", d => d.coat).attr("alt", d => `${d.label} Wappen`);
+    items.select(".compare-checkbox").property("checked", d => selectedCompareCantons.has(d.id));
     items.select(".canton-name").text(d => d.label);
     items.select(".canton-code").text(d => d.id);
     items.select(".rank-value").text(d => {
@@ -1045,6 +1067,7 @@ function setActiveCanton(id, event = null) {
     if (!id) {
         tooltip.classed("visible", false);
         lineHoverDateBox.classList.remove("visible");
+        g.selectAll("circle.hover-dot").remove();
         return;
     }
 
@@ -1053,9 +1076,15 @@ function setActiveCanton(id, event = null) {
 }
 
 function updateActiveStyles() {
+    const hasSelection = selectedCompareCantons.size > 0;
+
     seriesGroup.selectAll("path.line")
+        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none")
         .classed("is-muted", d => activeCanton && d.id !== activeCanton)
         .classed("is-active", d => activeCanton && d.id === activeCanton);
+
+    seriesGroup.selectAll("path.hit-line")
+        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none");
 
     seriesGroup.selectAll("path.hit-line")
         .filter(d => d.id === activeCanton)
@@ -1066,6 +1095,7 @@ function updateActiveStyles() {
         .raise();
 
     labelsGroup.selectAll("text")
+        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none")
         .style("opacity", d => !activeCanton || d.id === activeCanton ? 1 : 0.2)
         .style("font-size", d => activeCanton === d.id ? "15px" : "12px")
         .filter(d => d.id === activeCanton)
@@ -1095,9 +1125,39 @@ function showTooltip(event, cantonSeries) {
         lineHoverDateBox.style.left = `${hoverX}px`;
         lineHoverDateBox.style.top = `${my}px`;
         lineHoverDateBox.classList.add("visible");
-    }
 
-        tooltip.classed("visible", false);
+        // Hover-Punkt (Kreis) auf der Linie anzeigen
+        let hoverDot = g.selectAll("circle.hover-dot").data([closestPoint]);
+        hoverDot.join("circle")
+            .attr("class", "hover-dot dot")
+            .attr("cx", d => x(d.date))
+            .attr("cy", d => y(d.value))
+            .attr("r", 6)
+            .attr("fill", color(cantonSeries.id))
+            .attr("stroke", "var(--border)")
+            .attr("stroke-width", 2)
+            .style("display", "block");
+
+        // Detaillierten Tooltip anzeigen
+        const ranking = getRanking();
+        const rank = ranking.findIndex(d => d.id === cantonSeries.id) + 1;
+        const entry = ranking.find(d => d.id === cantonSeries.id);
+
+        if (entry) {
+            tooltip
+                .classed("visible", true)
+                .style("left", `${mx}px`)
+                .style("top", `${my}px`)
+                .html(`
+                  <div class="tooltip-title">
+                    <img src="${entry.coat}" alt="" />
+                    <span>#${rank} ${entry.label} (${entry.id})</span>
+                  </div>
+                  <div>Wert: <strong>${formatValue(closestPoint.value)}%</strong></div>
+                  <div>Datum: ${formatDate(closestPoint.date)}</div>
+                `);
+        }
+    }
 }
 
 // update wird in init() aufgerufen
