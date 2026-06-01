@@ -114,49 +114,34 @@ if (lineChartWrap) {
 const fromSlider = document.querySelector("#fromSlider");
 const toSlider = document.querySelector("#toSlider");
 const rangeLabel = document.querySelector("#rangeLabel");
-const rankingMode = document.querySelector("#rankingMode");
 const rankAggregationSelect = document.querySelector("#rankAggregation");
 const resetButton = document.querySelector("#resetButton");
 const replayRaceButton = document.querySelector("#replayRaceButton");
 const pauseRaceButton = document.querySelector("#pauseRaceButton");
 const raceSpeedSelect = document.querySelector("#raceSpeed");
-const raceContainer = document.querySelector("#raceContainer");
 const raceDateLabel = document.querySelector("#raceDateLabel");
 const rankingDescription = document.querySelector("#rankingDescription");
 const topCanton = document.querySelector("#topCanton");
 const topCantonSub = document.querySelector("#topCantonSub");
 const sportModeToggle = document.querySelector("#sportModeToggle");
+const raceDescription = document.querySelector("#raceDescription");
 
 // Audio for Sport Mode
-//const sportAudio = new Audio('TTS/output.wav');
-//sportAudio.preload = 'auto';
+const sportAudio = new Audio('TTS/output.wav');
+sportAudio.preload = 'auto';
 
-function normalizeDatasetDate(rawDate) {
-    if (!rawDate) return null;
-    const value = String(rawDate).trim();
-    const match = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-    if (!match) return null;
-    const [, day, month, year] = match;
-    return `${year}-${month}-${day}`;
-}
 
-async function loadVoteMetadataFromCsv() {
-    const csvText = await d3.text("data/DATASET CSV 28-05-2026.csv");
-    const rows = d3.dsvFormat(";").parse(csvText);
+function loadVoteMetadataFromSparql(nationalReferenda) {
     voteMetaByDate.clear();
-
-    rows.forEach(row => {
-        const dateKey = normalizeDatasetDate(row["datum"]);
-        if (!dateKey || voteMetaByDate.has(dateKey)) return;
-        const acceptedRaw = String(row["annahme"] ?? "").trim();
-        const accepted = acceptedRaw === "1";
-        const title = String(row["titel_off_d"] || row["titel_kurz_d"] || "").trim();
-        voteMetaByDate.set(dateKey, { title, accepted });
+    nationalReferenda.forEach(ref => {
+        if (!ref.date) return;
+        const accepted = ref.accepted === "1" || ref.accepted === "true" || ref.accepted === true;
+        voteMetaByDate.set(ref.date, { title: ref.title, accepted });
     });
 }
 
 // Helper to handle sport audio
-/*function syncSportAudio(action) {
+function syncSportAudio(action) {
     if (!sportModeToggle || !sportModeToggle.checked) {
         sportAudio.pause();
         return;
@@ -170,7 +155,7 @@ async function loadVoteMetadataFromCsv() {
         sportAudio.pause();
         sportAudio.currentTime = 0;
     }
-}*/
+}
 
 function applySportModeDesign(isSportMode) {
     document.body.classList.toggle("fun-mode", Boolean(isSportMode));
@@ -178,23 +163,9 @@ function applySportModeDesign(isSportMode) {
 
 function setSportModeRaceStartDate() {
     if (!votes.length) return;
-    const sportStartDate = parseDate("2002-03-03");
-    if (!sportStartDate) return;
-
-    let sportStartIndex = votes.findIndex(v => v.dateObj?.getTime() === sportStartDate.getTime());
-    if (sportStartIndex < 0) {
-        sportStartIndex = votes.findIndex(v => v.dateObj && v.dateObj >= sportStartDate);
-    }
-    if (sportStartIndex < 0) return;
-
-    state.fromIndex = sportStartIndex;
-    if (state.toIndex < state.fromIndex) {
-        state.toIndex = state.fromIndex;
-    }
-    fromSlider.value = state.fromIndex;
-    toSlider.value = state.toIndex;
-    updateSliderTrack();
-    update();
+    // Der Sportmodus verwendet jetzt den vom Benutzer gewählten Bereich.
+    // Falls ein spezifisches Startdatum für den Sportmodus gewünscht ist,
+    // kann es hier gesetzt werden. Aktuell belassen wir es bei der Auswahl.
 }
 
 if (sportModeToggle) {
@@ -202,17 +173,19 @@ if (sportModeToggle) {
 
     sportModeToggle.addEventListener("change", () => {
         applySportModeDesign(sportModeToggle.checked);
-/*
+
         if (!sportModeToggle.checked) {
             syncSportAudio('stop');
+            raceDescription.innerText = `Entwicklung der Stimmbeteiligung (gleitender Durchschnitt über 10 Abstimmungen).`;
         } else if (raceInterval && !raceIsPaused) {
             syncSportAudio('play');
-        }*/
+        }
 
         if (sportModeToggle.checked) {
             setSportModeRaceStartDate();
+            raceDescription.innerText = `Entwicklung der Stimmbeteiligung nach Abstimmungstermin mit echten Emotionen!`;
         }
-        
+
         // Beim Umschalten des Sportmodus Race immer neu aufbauen,
         // damit Filter + Startdatum sofort im RaceDateLabel sichtbar sind.
         const wasPaused = raceIsPaused;
@@ -271,7 +244,9 @@ const rangeWindow = g.append("rect")
 const seriesGroup = g.append("g").attr("class", "series-group");
 const labelsGroup = g.append("g").attr("class", "labels-group");
 
-const sparqlQuery = `SELECT ?date ?region (AVG(?participation) AS ?participation) WHERE {
+const sparqlQueryCanton = `
+SELECT ?date ?region (AVG(?participation) AS ?participation) 
+WHERE {
   <https://politics.ld.admin.ch/political-rights/popular-vote/1> <https://cube.link/observationSet> ?observationSet0 .
   ?observationSet0 <https://cube.link/observation> ?votation .
   ?votation <https://politics.ld.admin.ch/political-rights/popular-vote/region> ?region .
@@ -338,10 +313,14 @@ const cantonMap = {
 
 async function fetchLiveResults() {
     const [cantonResult, nationalResult] = await Promise.all([
-        fetchSparql(sparqlQuery),
+        fetchSparql(sparqlQueryCanton),
         fetchSparql(sparqlQueryNational)
     ]);
     const nationalReferenda = transformNationalMeta(nationalResult);
+
+    // Fill voteMetaByDate from SPARQL results
+    loadVoteMetadataFromSparql(nationalReferenda);
+
     return transformSparqlData(cantonResult, nationalReferenda);
 }
 
@@ -415,18 +394,15 @@ function transformNationalMeta(sparqlResult) {
     }));
 }
 
-loadVoteMetadataFromCsv()
-    .catch(err => console.warn("Failed to load vote metadata CSV", err))
-    .finally(() => {
-        fetchLiveResults().then(liveData => {
-            init(liveData);
-        }).catch(err => {
-            console.error('Failed to fetch live data, falling back to data.json', err);
-            d3.json("data.json").then(rawData => {
-                init(rawData);
-            });
-        });
+fetchLiveResults().then(liveData => {
+    init(liveData);
+}).catch(err => {
+    console.error('Failed to fetch live data, falling back to data.json', err);
+    d3.json("data.json").then(rawData => {
+        init(rawData);
     });
+});
+
 
 function init(rawData) {
     // -------------------------------------------------------------------------
@@ -563,6 +539,7 @@ function init(rawData) {
     startRace(false);
 }
 
+
 function getRankTimelineBuckets(mode) {
     if (mode === "1y") return 1;
     if (mode === "5y") return 5;
@@ -572,9 +549,10 @@ function getRankTimelineBuckets(mode) {
 
 function buildRankTimelineVotes(mode) {
     const bucketYears = getRankTimelineBuckets(mode);
+    const filteredVotes = votes.slice(state.fromIndex, state.toIndex + 1);
 
     if (!bucketYears) {
-        return votes.map(vote => ({
+        return filteredVotes.map(vote => ({
             key: vote.date,
             label: vote.dateLabel,
             cantons: (vote.cantons || []).map(canton => ({
@@ -585,12 +563,12 @@ function buildRankTimelineVotes(mode) {
         }));
     }
 
-    if (!votes.length) return [];
+    if (!filteredVotes.length) return [];
 
-    const firstYear = d3.min(votes, vote => vote.dateObj.getFullYear());
+    const firstYear = d3.min(filteredVotes, vote => vote.dateObj.getFullYear());
     const buckets = new Map();
 
-    for (const vote of votes) {
+    for (const vote of filteredVotes) {
         const year = vote.dateObj.getFullYear();
         const bucketIndex = Math.floor((year - firstYear) / bucketYears);
         const startYear = firstYear + bucketIndex * bucketYears;
@@ -806,6 +784,17 @@ function updateSliderTrack() {
 
     sliderTrackActive.style.left = Math.min(percent1, percent2) + "%";
     sliderTrackActive.style.width = Math.abs(percent2 - percent1) + "%";
+
+    const v1 = votes[val1];
+    const v2 = votes[val2];
+    if (v1 && v2) {
+        const startLabel = val1 <= val2 ? v1.dateLabel : v2.dateLabel;
+        const endLabel = val1 <= val2 ? v2.dateLabel : v1.dateLabel;
+        rangeLabel.textContent = `${startLabel} – ${endLabel}`;
+        if (raceDateLabel && (!raceInterval && raceK <= 1)) {
+            raceDateLabel.textContent = startLabel;
+        }
+    }
 }
 
 let isRangeWindowDragging = false;
@@ -834,7 +823,6 @@ function shiftRangeWindowByPointer(clientX) {
     fromSlider.value = state.fromIndex;
     toSlider.value = state.toIndex;
     updateSliderTrack();
-    update();
 }
 
 sliderTrackActive.addEventListener("pointerdown", (event) => {
@@ -865,6 +853,8 @@ function endRangeWindowDrag(event) {
             // Ignore if pointer was already released.
         }
     }
+    // Update ausführen nach dem Ziehen des Fensters
+    handleSliderChange();
 }
 
 sliderTrackActive.addEventListener("pointerup", endRangeWindowDrag);
@@ -873,30 +863,35 @@ sliderTrackActive.addEventListener("pointercancel", endRangeWindowDrag);
 // -------------------------------------------------------------------------
 // 6) Interaktion
 // -------------------------------------------------------------------------
-fromSlider.addEventListener("input", () => {
+function handleSliderInput() {
     state.fromIndex = Number(fromSlider.value);
-    if (state.fromIndex > state.toIndex) {
+    state.toIndex = Number(toSlider.value);
+
+    // Visuelle Synchronisation der Slider-Handles
+    if (this === fromSlider && state.fromIndex > state.toIndex) {
         state.toIndex = state.fromIndex;
         toSlider.value = state.toIndex;
-    }
-    updateSliderTrack();
-    update();
-});
-
-toSlider.addEventListener("input", () => {
-    state.toIndex = Number(toSlider.value);
-    if (state.toIndex < state.fromIndex) {
+    } else if (this === toSlider && state.toIndex < state.fromIndex) {
         state.fromIndex = state.toIndex;
         fromSlider.value = state.fromIndex;
     }
-    updateSliderTrack();
-    update();
-});
 
-rankingMode.addEventListener("change", () => {
-    state.rankingMode = rankingMode.value;
+    updateSliderTrack();
+}
+
+function handleSliderChange() {
     update();
-});
+    renderRankTimeline();
+    if (raceInterval || raceK > 0) {
+        startRace(!raceIsPaused);
+    }
+}
+
+fromSlider.addEventListener("input", handleSliderInput);
+toSlider.addEventListener("input", handleSliderInput);
+
+fromSlider.addEventListener("change", handleSliderChange);
+toSlider.addEventListener("change", handleSliderChange);
 
 if (rankAggregationSelect) {
     rankAggregationSelect.addEventListener("change", () => {
@@ -906,11 +901,11 @@ if (rankAggregationSelect) {
 
 resetButton.addEventListener("click", () => {
     selectedCompareCantons.clear();
-    state = { fromIndex: 0, toIndex: votes.length - 1, rankingMode: rankingMode.value };
-    fromSlider.value = state.fromIndex;
-    toSlider.value = state.toIndex;
-    updateSliderTrack();
+    // Falls der Reset Button auch die Slider zurücksetzen soll, hier die Logik ergänzen.
+    // Aktuell scheint er nur Cantons zu clearen, aber die Slider-Werte wurden im search-Block überschrieben.
+    // Ich stelle sicher, dass die UI nach dem Reset konsistent ist.
     update();
+    renderRankTimeline();
 });
 
 // -------------------------------------------------------------------------
@@ -930,7 +925,7 @@ const n = 26; // Alle 26 Kantone anzeigen
 const customRaceSpeeds = {
 
 };
-/*
+
 if (replayRaceButton) {
     replayRaceButton.addEventListener("click", () => {
         syncSportAudio('stop');
@@ -938,7 +933,7 @@ if (replayRaceButton) {
         syncSportAudio('play');
     });
 }
-*/
+
 if (pauseRaceButton) {
     pauseRaceButton.addEventListener("click", () => {
         if (globalTogglePause) globalTogglePause();
@@ -973,7 +968,7 @@ async function startRace(startImmediately = true) {
     const raceSvg = d3.select("#raceChart");
     const raceWidth = 980;
     const raceHeight = 600;
-    const raceMargin = { top: 20, right: 120, bottom: 10, left: 240 };
+    const raceMargin = { top: 40, right: 120, bottom: 10, left: 240 };
 
     const xRace = d3.scaleLinear().domain([0, 100]).range([raceMargin.left, raceWidth - raceMargin.right]);
     const yRace = d3.scaleBand()
@@ -983,21 +978,28 @@ async function startRace(startImmediately = true) {
 
     const formatNumber = d3.format(",.1f");
 
+    // X-Achse oben (Ticker)
+    let xAxisG = raceSvg.select(".race-x-axis");
+    if (xAxisG.empty()) {
+        xAxisG = raceSvg.append("g")
+            .attr("class", "race-x-axis")
+            .attr("transform", `translate(0, ${raceMargin.top})`);
+    }
+
+    const xAxis = d3.axisTop(xRace)
+        .ticks(raceWidth / 160)
+        .tickSizeOuter(0)
+        .tickSizeInner(-raceHeight + raceMargin.top + raceMargin.bottom);
+
     // Bereite Schlüsselbilder vor (Keyframes)
     raceKeyframes = [];
     const windowSize = 10; // Durchschnitt über die letzten 10 Abstimmungen (nur normaler Modus)
 
-    let raceVotes = votes;
-    if (sportModeToggle && sportModeToggle.checked) {
-        const startDate = new Date("2002-03-03");
-        const endDate = new Date("2008-02-24");
-        raceVotes = votes.filter(v => v.dateObj >= startDate && v.dateObj <= endDate);
-    }
+    const raceVotes = votes.slice(state.fromIndex, state.toIndex + 1);
 
     const voteIndexByTime = new Map(votes.map((vote, index) => [vote.dateObj.getTime(), index]));
 
-    for (let i = 0; i < raceVotes.length; i++) {
-        const currentVote = raceVotes[i];
+    for (const currentVote of raceVotes) {
         let frameCantons;
 
         if (sportModeToggle && sportModeToggle.checked) {
@@ -1017,7 +1019,6 @@ async function startRace(startImmediately = true) {
             const start = Math.max(0, originalIndex - windowSize + 1);
             const windowVotes = votes.slice(start, originalIndex + 1);
 
-            // Berechne Durchschnitt für jeden Kanton in diesem Fenster
             frameCantons = cantonIds.map(cid => {
                 const values = [];
                 for (const vote of windowVotes) {
@@ -1033,13 +1034,14 @@ async function startRace(startImmediately = true) {
         const sortedCantons = frameCantons.sort((a, b) => d3.descending(a.value, b.value));
         raceKeyframes.push([currentVote.dateObj, sortedCantons]);
     }
+    raceK = 0;
 
     function runRaceInterval() {
         if (raceInterval) {
             cancelAnimationFrame(raceInterval);
             raceInterval = null;
         }
-        let lastTs = 0;
+        let lastTs = performance.now();
         let elapsedMs = 0;
 
         const tick = (ts) => {
@@ -1047,27 +1049,31 @@ async function startRace(startImmediately = true) {
                 raceInterval = null;
                 return;
             }
-            if (!lastTs) {
-                lastTs = ts;
-            }
+            
             elapsedMs += ts - lastTs;
             lastTs = ts;
 
-            while (raceK < raceKeyframes.length) {
-                const currentSpeed = customRaceSpeeds[raceK] || raceSpeed;
-                if (elapsedMs < currentSpeed) break;
-                elapsedMs -= currentSpeed;
-                const transitionDuration = Math.max(70, currentSpeed - 40);
-                renderFrame(raceK, transitionDuration);
-                raceK++;
-            }
+            const currentSpeed = customRaceSpeeds[raceK] || raceSpeed;
 
-            if (raceK >= raceKeyframes.length) {
-                raceInterval = null;
-                if (pauseRaceButton) {
-                    pauseRaceButton.textContent = "↺ Wiederholen";
+            if (elapsedMs >= currentSpeed) {
+                // Berechne wie viele Frames wir überspringen oder abarbeiten müssen
+                // Bei extremem Lag kann raceK hier mehrfach erhöht werden
+                while (elapsedMs >= currentSpeed && raceK < raceKeyframes.length) {
+                    // Die Transition sollte so lang sein wie das Intervall, 
+                    // aber einen kleinen Puffer lassen für den nächsten Frame-Start
+                    const transitionDuration = Math.max(50, currentSpeed - 20);
+                    renderFrame(raceK, transitionDuration);
+                    raceK++;
+                    elapsedMs -= currentSpeed;
                 }
-                return;
+
+                if (raceK >= raceKeyframes.length) {
+                    raceInterval = null;
+                    if (pauseRaceButton) {
+                        pauseRaceButton.textContent = "↺ Wiederholen";
+                    }
+                    return;
+                }
             }
 
             raceInterval = requestAnimationFrame(tick);
@@ -1078,30 +1084,30 @@ async function startRace(startImmediately = true) {
 
     globalTogglePause = () => {
         if (!raceInterval && raceK >= raceKeyframes.length) {
-            //syncSportAudio('stop');
+            syncSportAudio('stop');
             startRace(true);
-            //syncSportAudio('play');
+            syncSportAudio('play');
             return;
         }
         if (!raceInterval && raceK === 0 && raceIsPaused) {
             raceIsPaused = false;
             if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
-            //syncSportAudio('play');
+            syncSportAudio('play');
             runRaceInterval();
             return;
         }
         raceIsPaused = !raceIsPaused;
         if (raceIsPaused) {
             if (pauseRaceButton) pauseRaceButton.textContent = "▶ Fortsetzen";
-            //syncSportAudio('pause');
+            syncSportAudio('pause');
             if (raceInterval) {
                 cancelAnimationFrame(raceInterval);
                 raceInterval = null;
             }
         } else {
             if (pauseRaceButton) pauseRaceButton.textContent = "⏸ Pause";
-            //syncSportAudio('play');
-            // runRaceInterval() setzt raceInterval neu und führt den nächsten Tick aus
+            syncSportAudio('play');
+            //runRaceInterval() setzt raceInterval neu und führt den nächsten Tick aus
             runRaceInterval();
         }
     };
@@ -1127,10 +1133,17 @@ async function startRace(startImmediately = true) {
 
     // Initiales Zeichnen
     function renderFrame(index, transitionDuration) {
+        if (!raceKeyframes[index]) return;
         const [date, frameData] = raceKeyframes[index];
-        raceDateLabel.textContent = formatDate(date);
+        if (raceDateLabel) {
+            raceDateLabel.textContent = formatDate(date);
+        }
 
         const displayedData = frameData.slice(0, n);
+
+        // Update X-Achse
+        xAxisG.transition("race-transition").duration(transitionDuration).ease(d3.easeLinear).call(xAxis);
+        xAxisG.select(".domain").remove();
 
         // Update top leader card in real-time with the race
         const currentTop = displayedData[0];
@@ -1139,6 +1152,7 @@ async function startRace(startImmediately = true) {
             topCantonSub.textContent = `${currentTop.label}: ${formatValue(currentTop.value)}%`;
         }
 
+        // 1. Balken-Update: Nur Position und Breite animieren
         raceSvg.selectAll("rect.bar")
             .data(displayedData, d => d.id)
             .join(
@@ -1150,39 +1164,53 @@ async function startRace(startImmediately = true) {
                     .attr("height", yRace.bandwidth())
                     .attr("width", 0),
                 update => update,
-                exit => exit.transition().duration(transitionDuration).attr("width", 0).attr("y", yRace(n)).remove()
+                exit => exit.transition("race-transition").duration(transitionDuration).attr("width", 0).attr("y", yRace(n)).remove()
             )
-            .interrupt()
-            .transition().duration(transitionDuration).ease(d3.easeLinear)
-            .attr("y", (d, i) => yRace(i))
-            .attr("width", d => xRace(d.value) - xRace(0))
-            .selection()
             .classed("podium-1", (d, i) => i === 0)
             .classed("podium-2", (d, i) => i === 1)
-            .classed("podium-3", (d, i) => i === 2);
+            .classed("podium-3", (d, i) => i === 2)
+            .transition("race-transition").duration(transitionDuration).ease(d3.easeLinear)
+            .attr("y", (d, i) => yRace(i))
+            .attr("width", d => xRace(d.value) - xRace(0));
 
+        // 2. Label-Update: Nur Position animieren, Text sofort setzen
         raceSvg.selectAll("text.bar-label")
             .data(displayedData, d => d.id)
             .join(
                 enter => enter.append("text")
                     .attr("class", "bar-label")
                     .attr("text-anchor", "end")
-                    .attr("x", xRace(0) - 10)
+                    .attr("x", xRace(0) - 45)
                     .attr("y", d => yRace(n) + yRace.bandwidth() / 2)
-                    .attr("dy", "0.35em")
-                    .text(d => d.label),
+                    .attr("dy", "0.35em"),
                 update => update,
-                exit => exit.transition().duration(transitionDuration).attr("y", yRace(n)).remove()
+                exit => exit.transition("race-transition").duration(transitionDuration).attr("y", yRace(n)).remove()
             )
-            .interrupt()
-            .transition().duration(transitionDuration).ease(d3.easeLinear)
-            .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
             .text(d => d.label)
-            .selection()
             .classed("podium-1", (d, i) => i === 0)
             .classed("podium-2", (d, i) => i === 1)
-            .classed("podium-3", (d, i) => i === 2);
+            .classed("podium-3", (d, i) => i === 2)
+            .transition("race-transition").duration(transitionDuration).ease(d3.easeLinear)
+            .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2);
 
+        // 2b. Coat of Arms Update
+        raceSvg.selectAll("image.bar-coat")
+            .data(displayedData, d => d.id)
+            .join(
+                enter => enter.append("image")
+                    .attr("class", "bar-coat")
+                    .attr("x", xRace(0) - 40)
+                    .attr("y", d => yRace(n))
+                    .attr("height", yRace.bandwidth())
+                    .attr("width", yRace.bandwidth())
+                    .attr("xlink:href", d => coatOfArms[d.id] || fallbackCoat),
+                update => update,
+                exit => exit.transition("race-transition").duration(transitionDuration).attr("y", yRace(n)).remove()
+            )
+            .transition("race-transition").duration(transitionDuration).ease(d3.easeLinear)
+            .attr("y", (d, i) => yRace(i));
+
+        // 3. Werte-Update: Position animieren, Text sofort setzen
         raceSvg.selectAll("text.bar-value")
             .data(displayedData, d => d.id)
             .join(
@@ -1190,26 +1218,35 @@ async function startRace(startImmediately = true) {
                     .attr("class", "bar-value")
                     .attr("x", d => xRace(0) + 6)
                     .attr("y", d => yRace(n) + yRace.bandwidth() / 2)
-                    .attr("dy", "0.35em")
-                    .text(d => formatNumber(d.value) + "%"),
+                    .attr("dy", "0.35em"),
                 update => update,
-                exit => exit.transition().duration(transitionDuration).attr("y", yRace(n)).remove()
+                exit => exit.transition("race-transition").duration(transitionDuration).attr("y", yRace(n)).remove()
             )
-            .interrupt()
-            .transition().duration(transitionDuration).ease(d3.easeLinear)
-            .attr("x", d => xRace(d.value) + 6)
-            .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2)
             .text(d => formatNumber(d.value) + "%")
-            .selection()
             .classed("podium-1", (d, i) => i === 0)
             .classed("podium-2", (d, i) => i === 1)
-            .classed("podium-3", (d, i) => i === 2);
+            .classed("podium-3", (d, i) => i === 2)
+            .transition("race-transition").duration(transitionDuration).ease(d3.easeLinear)
+            .attr("x", d => xRace(d.value) + 6)
+            .attr("y", (d, i) => yRace(i) + yRace.bandwidth() / 2);
     }
+
+    if (raceKeyframes.length === 0) {
+        console.warn("No keyframes for race.");
+        if (raceDateLabel) {
+            raceDateLabel.textContent = "Keine Daten";
+        }
+        return;
+    }
+
+    // Sofort den ersten Frame zeichnen für direktes Feedback beim Sliden
+    if (raceDateLabel) {
+        renderFrame(0, 0);
+    }
+    raceK = 1;
 
     if (startImmediately) {
         runRaceInterval();
-    } else {
-        renderFrame(0, 0);
     }
 }
 
@@ -1229,7 +1266,7 @@ function getSelectedDateRange() {
 }
 
 function getRanking() {
-    const cacheKey = `${state.fromIndex}|${state.toIndex}|${state.rankingMode}`;
+    const cacheKey = `${state.fromIndex}|${state.toIndex}`;
     if (cacheKey === rankingCacheKey) {
         return rankingCacheValue;
     }
@@ -1249,9 +1286,7 @@ function getRanking() {
         const change = last.value - first.value;
 
         let score;
-        if (state.rankingMode === "end") score = last.value;
-        else if (state.rankingMode === "change") score = change;
-        else score = avg;
+        score = avg;
 
         return {
             id,
@@ -1273,8 +1308,6 @@ function getRanking() {
 }
 
 function getModeText() {
-    if (state.rankingMode === "end") return "Endwert";
-    if (state.rankingMode === "change") return "Veränderung";
     return "Durchschnitt";
 }
 
@@ -1284,6 +1317,9 @@ function update() {
     const top = ranking[0];
 
     rangeLabel.textContent = `${startLabel} – ${endLabel}`;
+    if (raceDateLabel && (!raceInterval && raceK <= 1)) {
+        raceDateLabel.textContent = startLabel;
+    }
     rankingDescription.textContent = `${getModeText()} im Zeitraum ${startLabel} bis ${endLabel}`;
 
     if (top) {
@@ -1449,10 +1485,10 @@ function showTooltip(event, cantonSeries) {
             seen.add(key);
             uniqueItems.push(item);
         }
-
         lineHoverDateBox.innerHTML = uniqueItems
-            .map((item, index) => `${index + 1}. ${getAcceptedBadge(item.accepted)} ${escapeHtml(item.title)}`)
-            .join("<br>");
+            .map((item, index) => `${escapeHtml(item.title)} (${getAcceptedBadge(item.accepted)} ${item.accepted === 1 ? "angenommen" : "abgelehnt"})`)
+            .join("<br><br>");
+        lineHoverDateBox.classList.add("visible");
         lineHoverDateBox.style.left = `${hoverX}px`;
         lineHoverDateBox.style.top = `${my}px`;
         lineHoverDateBox.classList.add("visible");

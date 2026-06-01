@@ -15,9 +15,16 @@
         <div>
             <h1>Kantonsranking über Zeit</h1>
             <p class="intro">
-                Multi-Line-Chart mit dynamischem Zeitraumfilter. Jede Linie steht für einen Kanton;
-                rechts wird das Ranking für den gewählten Von/Bis-Zeitraum berechnet.
+                Multi-Line-Chart mit dynamischem Zeitraumfilter. Jede Linie steht für einen Kanton. Wechsle in den Sportmodus, um das Wettrennen mit echten Emotionen zu erleben.
             </p>
+        </div>
+        <div class="sport-toggle-container">
+            <span class="toggle-label-text">Normal</span>
+            <label class="fun-switch" aria-label="Sport Mode Toggle">
+                <input type="checkbox" id="sportModeToggle">
+                <span class="fun-slider"></span>
+            </label>
+            <span class="toggle-label-text">Sport</span>
         </div>
 
         <aside class="metric-card" aria-live="polite">
@@ -27,22 +34,57 @@
         </aside>
     </header>
 
+    <section class="controls" aria-label="Filter">
+        <div class="control-grid">
+            <div class="control-group">
+                <label>
+                    <h2>Ausgewählter Zeitraum</h2>
+                    <strong id="rangeLabel">–</strong>
+                </label>
+                <div class="range-slider-container">
+                    <input id="fromSlider" type="range" min="0" max="0" value="0" step="1" />
+                    <input id="toSlider" type="range" min="0" max="0" value="0" step="1" />
+                    <div class="slider-track"></div>
+                </div>
+            </div>
+
+            <div class="select-wrap">
+                <button id="resetButton" type="button">Reset</button>
+            </div>
+        </div>
+    </section>
+
     <section class="dashboard">
+        <article class="chart-card">
+            <div class="card-header">
+                <div>
+                    <h2>Verlauf nach Kanton</h2>
+                    <p>Hover über Linie oder Ranking-Eintrag hebt einen Kanton hervor.</p>
+                </div>
+            </div>
+            <div class="chart-wrap">
+                <div id="tooltip" class="tooltip"></div>
+                <svg id="chart" viewBox="0 0 980 620" role="img" aria-label="Multi-Line-Chart der Kantonswerte"></svg>
+            </div>
+        </article>
+
+        <aside class="ranking-card">
+            <div class="card-header">
+                <div>
+                    <h2>Dynamisches Ranking</h2>
+                    <p id="rankingDescription">–</p>
+                </div>
+            </div>
+            <div id="rankingList" class="ranking-list"></div>
+        </aside>
+
         <article class="chart-card race-card" id="raceContainer">
             <div class="card-header">
                 <div>
                     <h2>Bar Chart Race</h2>
-                    <p>Entwicklung der Stimmbeteiligung (gleitender Durchschnitt über 10 Abstimmungen).</p>
+                    <p id="raceDescription">Entwicklung der Stimmbeteiligung (gleitender Durchschnitt über 10 Abstimmungen).</p>
                 </div>
                 <div class="race-controls">
-                    <div class="sport-toggle-container">
-                        <span class="toggle-label-text">Normal</span>
-                        <label class="fun-switch" aria-label="Sport Mode Toggle">
-                            <input type="checkbox" id="sportModeToggle">
-                            <span class="fun-slider"></span>
-                        </label>
-                        <span class="toggle-label-text">Sport</span>
-                    </div>
                     <span id="raceDateLabel" class="race-date"></span>
                     <button id="replayRaceButton" type="button" class="btn-primary">↺ Neustart</button>
                     <button id="pauseRaceButton" type="button">⏸ Pause</button>
@@ -77,54 +119,6 @@
                 <svg id="rankTimelineChart" viewBox="0 0 980 560" role="img" aria-label="Rangverlauf der Kantone je Abstimmungsdatum"></svg>
             </div>
         </article>
-
-        <section class="controls" aria-label="Filter">
-            <div class="control-grid">
-                <div class="control-group">
-                    <label>
-                        <span>Zeitraum</span>
-                        <strong id="rangeLabel">–</strong>
-                    </label>
-                    <div class="range-slider-container">
-                        <input id="fromSlider" type="range" min="0" max="0" value="0" step="1" />
-                        <input id="toSlider" type="range" min="0" max="0" value="0" step="1" />
-                        <div class="slider-track"></div>
-                    </div>
-                </div>
-
-                <div class="select-wrap">
-                    <select id="rankingMode" title="Ranking-Modus">
-                        <option value="avg">Ranking: Durchschnitt</option>
-                        <option value="end">Ranking: Endwert</option>
-                        <option value="change">Ranking: Veränderung</option>
-                    </select>
-                    <button id="resetButton" type="button">Reset</button>
-                </div>
-            </div>
-        </section>
-
-        <article class="chart-card">
-            <div class="card-header">
-                <div>
-                    <h2>Verlauf nach Kanton</h2>
-                    <p>Hover über Linie oder Ranking-Eintrag hebt einen Kanton hervor.</p>
-                </div>
-            </div>
-            <div class="chart-wrap">
-                <div id="tooltip" class="tooltip"></div>
-                <svg id="chart" viewBox="0 0 980 620" role="img" aria-label="Multi-Line-Chart der Kantonswerte"></svg>
-            </div>
-        </article>
-
-        <aside class="ranking-card">
-            <div class="card-header">
-                <div>
-                    <h2>Dynamisches Ranking</h2>
-                    <p id="rankingDescription">–</p>
-                </div>
-            </div>
-            <div id="rankingList" class="ranking-list"></div>
-        </aside>
     </section>
 </main>
 

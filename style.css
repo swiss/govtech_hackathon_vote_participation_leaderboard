@@ -45,7 +45,7 @@ body {
 
 header {
     display: grid;
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: 1fr 200px 340px;
     gap: 32px;
     align-items: center;
     margin-bottom: 40px;
@@ -55,6 +55,8 @@ header {
     padding: 32px;
     box-shadow: var(--shadow);
 }
+
+
 
 .eyebrow {
     color: var(--accent);
@@ -136,8 +138,7 @@ h1 {
     border-radius: var(--radius);
     padding: 28px;
     box-shadow: var(--shadow);
-    grid-column: 1 / -1;
-    margin-bottom: 0;
+    margin-bottom: 32px;
 }
 
 .control-grid {
@@ -228,18 +229,15 @@ h1 {
     justify-content: space-between;
     gap: 12px;
     color: var(--text);
-    font-size: 14px;
-    font-weight: 700;
-    margin-bottom: 12px;
 }
 
 .control-group strong {
     color: var(--accent-2);
-    font-weight: 800;
     background: #eff6ff;
     padding: 2px 8px;
     border-radius: 6px;
     border: 1.5px solid var(--border);
+    height: 30px;
 }
 
 .select-wrap {
@@ -642,6 +640,22 @@ svg {
     gap: 16px;
 }
 
+.race-x-axis .tick line {
+    stroke: var(--grid);
+    stroke-dasharray: 2,2;
+}
+
+.race-x-axis text {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 11px;
+    fill: var(--muted);
+}
+
+.race-x-axis .domain {
+    display: none;
+}
+
 .race-date {
     font-size: 24px;
     font-weight: 900;
@@ -854,7 +868,7 @@ body.fun-mode .chart-card:hover,
 body.fun-mode .ranking-card:hover,
 body.fun-mode .metric-card:hover,
 body.fun-mode .controls:hover {
-    transform: translate(-4px, -4px) rotate(0.5deg);
+    /* transform: translate(-4px, -4px) rotate(0.5deg); */
     box-shadow: var(--shadow-hover);
 }
 
