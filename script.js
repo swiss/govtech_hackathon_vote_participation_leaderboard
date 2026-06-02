@@ -1,3 +1,11 @@
+/**
+ * @deprecated Diese Datei ist veraltet und wird nicht mehr aktiv gepflegt.
+ * Die Funktionalität wurde in die neue modulare Struktur im Verzeichnis `js/` migriert.
+ * Bitte nutzen Sie stattdessen `js/main.js` als Einstiegspunkt.
+ */
+console.warn(
+    "DEPRECATION WARNING: 'script.js' ist veraltet. Bitte verwenden Sie die neue modulare Architektur (js/main.js)."
+);
 
 // -------------------------------------------------------------------------
 // 1) Daten laden
@@ -208,6 +216,13 @@ const innerHeight = height - margin.top - margin.bottom;
 const g = svg.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
+// Definiere Clip-Path, um Überlauf zu verhindern
+svg.append("defs").append("clipPath")
+    .attr("id", "chart-clip-legacy")
+    .append("rect")
+    .attr("width", innerWidth)
+    .attr("height", innerHeight);
+
 const x = d3.scaleTime().range([0, innerWidth]);
 const y = d3.scaleLinear().range([innerHeight, 0]);
 const color = d3.scaleOrdinal().range(d3.schemeTableau10.concat(d3.schemeSet3));
@@ -241,8 +256,9 @@ const rangeWindow = g.append("rect")
     .attr("height", innerHeight)
     .attr("rx", 10);
 
-const seriesGroup = g.append("g").attr("class", "series-group");
-const labelsGroup = g.append("g").attr("class", "labels-group");
+const seriesGroup = g.append("g")
+    .attr("class", "series-group")
+    .attr("clip-path", "url(#chart-clip-legacy)");
 
 const sparqlQueryCanton = `
 SELECT ?date ?region (AVG(?participation) AS ?participation) 
@@ -519,20 +535,6 @@ function init(rawData) {
             scheduleTooltip(event, d);
         })
         .on("pointerleave", () => setActiveCanton(null));
-
-    labelsGroup.selectAll("text")
-        .data(series, d => d.id)
-        .join("text")
-        .attr("dy", "0.32em")
-        .attr("fill", d => color(d.id))
-        .attr("font-size", 12)
-        .attr("font-weight", 800)
-        .text(d => d.id)
-        .on("pointerenter", (event, d) => setActiveCanton(d.id, event))
-        .on("pointerleave", () => setActiveCanton(null))
-        .transition().duration(400)
-        .attr("x", d => x(d.values.at(-1).date) + 8)
-        .attr("y", d => y(d.values.at(-1).value));
 
     renderRankTimeline();
     update();
@@ -1342,15 +1344,6 @@ function update() {
         .transition().duration(220)
         .attr("d", d => line(d.values));
 
-    labelsGroup.selectAll("text")
-        .transition().duration(220)
-        .attr("x", d => x(d.values.at(-1).date) + 8)
-        .attr("y", d => y(d.values.at(-1).value))
-        .style("opacity", d => {
-            const lastDate = d.values.at(-1).date;
-            return (lastDate >= start && lastDate <= end) ? 1 : 0;
-        });
-
     updateSliderTrack();
     renderRanking(ranking);
     updateActiveStyles();
@@ -1440,13 +1433,6 @@ function updateActiveStyles() {
         .raise();
 
     seriesGroup.selectAll("path.line")
-        .filter(d => d.id === activeCanton)
-        .raise();
-
-    labelsGroup.selectAll("text")
-        .style("display", d => !hasSelection || selectedCompareCantons.has(d.id) ? "block" : "none")
-        .style("opacity", d => !activeCanton || d.id === activeCanton ? 1 : 0.2)
-        .style("font-size", d => activeCanton === d.id ? "15px" : "12px")
         .filter(d => d.id === activeCanton)
         .raise();
 
